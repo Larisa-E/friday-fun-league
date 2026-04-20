@@ -17,7 +17,7 @@ return new class extends Migration
             $table->foreignId('loser_id')->constrained('participants')->cascadeOnDelete();  // FK → participants.id
             $table->integer('winner_score');                                               // Score of the winner
             $table->integer('loser_score');                                                // Score of the loser
-            $table->string('game_type')->nullable();                                       // e.g. "UNO", "Chess" (optional)
+            $table->string('game_type')->nullable();                                       // "UNO", "Chess" (optional)
             $table->timestamp('played_at')->useCurrent();                                  // When the match was played
             $table->timestamps();                                                          // created_at & updated_at
         });
