@@ -3,44 +3,60 @@
 namespace App\Http\Controllers;
 
 use App\Models\MatchGame;
-use App\Models\Participant;
+use App\Services\LeagueStatsService;
 use Illuminate\Http\Request;
-
-use function Symfony\Component\Clock\now;
+use Illuminate\Support\Facades\DB;
 
 class MatchGameController extends Controller
 {
     // register match form submission
-    public function store(Request $request)
+    public function store(Request $request, LeagueStatsService $leagueStats)
     {
-        // inputs
-        $request->validate([
+        $validated = $request->validate([
             'winner_id' => 'required|exists:participants,id',
             'loser_id' => 'required|exists:participants,id|different:winner_id',
             'winner_score' => 'required|integer|min:0',
-            'loser_score' => 'required|integer|min:0',
+            'loser_score' => 'required|integer|min:0|lt:winner_score',
             'game_type' => 'nullable|string|max:50',
         ]);
 
-        // match record
-        MatchGame::create([
-            'winner_id' => $request->winner_id,
-            'loser_id' => $request->loser_id,
-            'winner_score' => $request->winner_score,
-            'loser_score' => $request->loser_score,
-            'game_type' => $request->game_type,
-            'played_at'=> now(),
-        ]);
+        DB::transaction(function () use ($validated, $leagueStats): void {
+            MatchGame::create([
+                ...$validated,
+                'played_at' => now(),
+            ]);
 
-        // Update loser stats
-        Participant::find($request->winner_id) ->increment('losses'); 
-        Participant::find($request->loser_id) ->increment('matches_played');
-
-        // Update winner stats
-        Participant::find($request->winner_id) ->increment('points', 3); // 3 points per win
-        Participant::find($request->winner_id) ->increment('wins'); 
-        Participant::find($request->winner_id) ->increment('matches_played');
+            $leagueStats->recalculateParticipantStats();
+        });
 
         return redirect()->route('dashboard')->with('success', 'Match recorded successfully!');
+    }
+
+    public function update(Request $request, MatchGame $match, LeagueStatsService $leagueStats)
+    {
+        $validated = $request->validate([
+            'winner_id' => 'required|exists:participants,id',
+            'loser_id' => 'required|exists:participants,id|different:winner_id',
+            'winner_score' => 'required|integer|min:0',
+            'loser_score' => 'required|integer|min:0|lt:winner_score',
+            'game_type' => 'nullable|string|max:50',
+        ]);
+
+        DB::transaction(function () use ($match, $validated, $leagueStats): void {
+            $match->update($validated);
+            $leagueStats->recalculateParticipantStats();
+        });
+
+        return redirect()->route('dashboard')->with('success', 'Match updated successfully!');
+    }
+
+    public function destroy(MatchGame $match, LeagueStatsService $leagueStats)
+    {
+        DB::transaction(function () use ($match, $leagueStats): void {
+            $match->delete();
+            $leagueStats->recalculateParticipantStats();
+        });
+
+        return redirect()->route('dashboard')->with('success', 'Match deleted successfully!');
     }
 }
