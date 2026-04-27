@@ -6,6 +6,7 @@ use App\Models\Participant;
 use App\Services\LeagueStatsService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Validator;
 
 class ParticipantController extends Controller
 {
@@ -27,10 +28,20 @@ class ParticipantController extends Controller
 
     public function update(Request $request, Participant $participant)
     {
-        $validated = $request->validate([
+        $validator = Validator::make($request->all(), [
             'name' => 'required|string|max:100|unique:participants,name,' . $participant->id,
             'avatar_emoji' => 'nullable|max:10',
         ]);
+
+        if ($validator->fails()) {
+            return redirect()
+                ->route('dashboard')
+                ->withErrors($validator, 'participantUpdate.' . $participant->id)
+                ->withInput()
+                ->with('openModal', 'editParticipantModal' . $participant->id);
+        }
+
+        $validated = $validator->validated();
 
         $participant->update($validated);
 

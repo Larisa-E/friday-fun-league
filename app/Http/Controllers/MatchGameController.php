@@ -6,6 +6,7 @@ use App\Models\MatchGame;
 use App\Services\LeagueStatsService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Validator;
 
 class MatchGameController extends Controller
 {
@@ -34,13 +35,23 @@ class MatchGameController extends Controller
 
     public function update(Request $request, MatchGame $match, LeagueStatsService $leagueStats)
     {
-        $validated = $request->validate([
+        $validator = Validator::make($request->all(), [
             'winner_id' => 'required|exists:participants,id',
             'loser_id' => 'required|exists:participants,id|different:winner_id',
             'winner_score' => 'required|integer|min:0',
             'loser_score' => 'required|integer|min:0|lt:winner_score',
             'game_type' => 'nullable|string|max:50',
         ]);
+
+        if ($validator->fails()) {
+            return redirect()
+                ->route('dashboard')
+                ->withErrors($validator, 'matchUpdate.' . $match->id)
+                ->withInput()
+                ->with('openModal', 'editMatchModal' . $match->id);
+        }
+
+        $validated = $validator->validated();
 
         DB::transaction(function () use ($match, $validated, $leagueStats): void {
             $match->update($validated);

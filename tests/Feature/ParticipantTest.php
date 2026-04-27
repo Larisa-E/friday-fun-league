@@ -2,6 +2,9 @@
 
 namespace Tests\Feature;
 
+use App\Models\MatchGame;
+use App\Models\Participant;
+use App\Services\LeagueStatsService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tests\TestCase;
 
@@ -27,5 +30,95 @@ class ParticipantTest extends TestCase
             'losses' => 0,
             'matches_played' => 0,
         ]);
+    }
+
+    public function test_a_participant_can_be_updated(): void
+    {
+        $participant = Participant::create([
+            'name' => 'Alice',
+            'avatar_emoji' => ':)',
+        ]);
+
+        $response = $this->put(route('participants.update', $participant), [
+            'name' => 'Alicia',
+            'avatar_emoji' => ':D',
+        ]);
+
+        $response->assertRedirect(route('dashboard'));
+        $response->assertSessionHas('success');
+
+        $this->assertDatabaseHas('participants', [
+            'id' => $participant->id,
+            'name' => 'Alicia',
+            'avatar_emoji' => ':D',
+        ]);
+    }
+
+    public function test_failed_participant_update_reopens_the_matching_modal_with_errors(): void
+    {
+        $participant = Participant::create([
+            'name' => 'Alice',
+            'avatar_emoji' => ':)',
+        ]);
+
+        Participant::create([
+            'name' => 'Bob',
+            'avatar_emoji' => ':(',
+        ]);
+
+        $response = $this->from(route('dashboard'))->put(route('participants.update', $participant), [
+            'name' => 'Bob',
+            'avatar_emoji' => ':D',
+        ]);
+
+        $response->assertRedirect(route('dashboard'));
+        $response->assertSessionHasErrorsIn('participantUpdate.' . $participant->id, ['name']);
+        $response->assertSessionHas('openModal', 'editParticipantModal' . $participant->id);
+
+        $this->assertDatabaseHas('participants', [
+            'id' => $participant->id,
+            'name' => 'Alice',
+        ]);
+    }
+
+    public function test_a_participant_can_be_deleted_and_related_matches_are_removed(): void
+    {
+        $winner = Participant::create([
+            'name' => 'Alice',
+            'avatar_emoji' => ':)',
+        ]);
+
+        $loser = Participant::create([
+            'name' => 'Bob',
+            'avatar_emoji' => ':(',
+        ]);
+
+        MatchGame::create([
+            'winner_id' => $winner->id,
+            'loser_id' => $loser->id,
+            'winner_score' => 10,
+            'loser_score' => 7,
+            'game_type' => 'UNO',
+            'played_at' => now(),
+        ]);
+
+        app(LeagueStatsService::class)->recalculateParticipantStats();
+
+        $response = $this->delete(route('participants.destroy', $winner));
+
+        $response->assertRedirect(route('dashboard'));
+        $response->assertSessionHas('success');
+
+        $this->assertDatabaseMissing('participants', [
+            'id' => $winner->id,
+        ]);
+        $this->assertDatabaseCount('match_games', 0);
+
+        $loser->refresh();
+
+        $this->assertSame(0, $loser->points);
+        $this->assertSame(0, $loser->wins);
+        $this->assertSame(0, $loser->losses);
+        $this->assertSame(0, $loser->matches_played);
     }
 }

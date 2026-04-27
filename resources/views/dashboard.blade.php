@@ -320,6 +320,11 @@
 </div>
 
 @foreach($participants as $participant)
+@php
+    $participantModalId = 'editParticipantModal' . $participant->id;
+    $participantErrorBag = $errors->getBag('participantUpdate.' . $participant->id);
+    $isParticipantModalOpen = session('openModal') === $participantModalId;
+@endphp
 <div class="modal fade" id="editParticipantModal{{ $participant->id }}" tabindex="-1" aria-hidden="true">
     <div class="modal-dialog modal-dialog-centered">
         <div class="modal-content">
@@ -333,11 +338,17 @@
                 <div class="modal-body">
                     <div class="mb-3">
                         <label for="edit_participant_name_{{ $participant->id }}" class="form-label">Name</label>
-                        <input id="edit_participant_name_{{ $participant->id }}" type="text" name="name" class="form-control" value="{{ $participant->name }}" required>
+                        <input id="edit_participant_name_{{ $participant->id }}" type="text" name="name" class="form-control @if($participantErrorBag->has('name')) is-invalid @endif" value="{{ $isParticipantModalOpen ? old('name', $participant->name) : $participant->name }}" required>
+                        @if($participantErrorBag->has('name'))
+                            <div class="field-error">{{ $participantErrorBag->first('name') }}</div>
+                        @endif
                     </div>
                     <div class="mb-0">
                         <label for="edit_participant_avatar_{{ $participant->id }}" class="form-label">Avatar Emoji</label>
-                        <input id="edit_participant_avatar_{{ $participant->id }}" type="text" name="avatar_emoji" class="form-control" value="{{ $participant->avatar_emoji }}" placeholder="Optional">
+                        <input id="edit_participant_avatar_{{ $participant->id }}" type="text" name="avatar_emoji" class="form-control @if($participantErrorBag->has('avatar_emoji')) is-invalid @endif" value="{{ $isParticipantModalOpen ? old('avatar_emoji', $participant->avatar_emoji) : $participant->avatar_emoji }}" placeholder="Optional">
+                        @if($participantErrorBag->has('avatar_emoji'))
+                            <div class="field-error">{{ $participantErrorBag->first('avatar_emoji') }}</div>
+                        @endif
                     </div>
                 </div>
                 <div class="modal-footer">
@@ -351,6 +362,11 @@
 @endforeach
 
 @foreach($matchHistory as $match)
+@php
+    $matchModalId = 'editMatchModal' . $match->id;
+    $matchErrorBag = $errors->getBag('matchUpdate.' . $match->id);
+    $isMatchModalOpen = session('openModal') === $matchModalId;
+@endphp
 <div class="modal fade" id="editMatchModal{{ $match->id }}" tabindex="-1" aria-hidden="true">
     <div class="modal-dialog modal-dialog-centered modal-lg">
         <div class="modal-content">
@@ -365,31 +381,46 @@
                     <div class="row g-3">
                         <div class="col-md-6">
                             <label for="edit_match_winner_{{ $match->id }}" class="form-label">Winner</label>
-                            <select id="edit_match_winner_{{ $match->id }}" name="winner_id" class="form-select" required>
+                            <select id="edit_match_winner_{{ $match->id }}" name="winner_id" class="form-select @if($matchErrorBag->has('winner_id')) is-invalid @endif" required>
                                 @foreach($participants as $participant)
-                                <option value="{{ $participant->id }}" @selected($match->winner_id === $participant->id)>{{ $participant->name }}</option>
+                                <option value="{{ $participant->id }}" @selected(($isMatchModalOpen ? (int) old('winner_id', $match->winner_id) : $match->winner_id) === $participant->id)>{{ $participant->name }}</option>
                                 @endforeach
                             </select>
+                            @if($matchErrorBag->has('winner_id'))
+                                <div class="field-error">{{ $matchErrorBag->first('winner_id') }}</div>
+                            @endif
                         </div>
                         <div class="col-md-6">
                             <label for="edit_match_loser_{{ $match->id }}" class="form-label">Loser</label>
-                            <select id="edit_match_loser_{{ $match->id }}" name="loser_id" class="form-select" required>
+                            <select id="edit_match_loser_{{ $match->id }}" name="loser_id" class="form-select @if($matchErrorBag->has('loser_id')) is-invalid @endif" required>
                                 @foreach($participants as $participant)
-                                <option value="{{ $participant->id }}" @selected($match->loser_id === $participant->id)>{{ $participant->name }}</option>
+                                <option value="{{ $participant->id }}" @selected(($isMatchModalOpen ? (int) old('loser_id', $match->loser_id) : $match->loser_id) === $participant->id)>{{ $participant->name }}</option>
                                 @endforeach
                             </select>
+                            @if($matchErrorBag->has('loser_id'))
+                                <div class="field-error">{{ $matchErrorBag->first('loser_id') }}</div>
+                            @endif
                         </div>
                         <div class="col-md-6">
                             <label for="edit_winner_score_{{ $match->id }}" class="form-label">Winner Score</label>
-                            <input id="edit_winner_score_{{ $match->id }}" type="number" name="winner_score" class="form-control" min="0" value="{{ $match->winner_score }}" required>
+                            <input id="edit_winner_score_{{ $match->id }}" type="number" name="winner_score" class="form-control @if($matchErrorBag->has('winner_score')) is-invalid @endif" min="0" value="{{ $isMatchModalOpen ? old('winner_score', $match->winner_score) : $match->winner_score }}" required>
+                            @if($matchErrorBag->has('winner_score'))
+                                <div class="field-error">{{ $matchErrorBag->first('winner_score') }}</div>
+                            @endif
                         </div>
                         <div class="col-md-6">
                             <label for="edit_loser_score_{{ $match->id }}" class="form-label">Loser Score</label>
-                            <input id="edit_loser_score_{{ $match->id }}" type="number" name="loser_score" class="form-control" min="0" value="{{ $match->loser_score }}" required>
+                            <input id="edit_loser_score_{{ $match->id }}" type="number" name="loser_score" class="form-control @if($matchErrorBag->has('loser_score')) is-invalid @endif" min="0" value="{{ $isMatchModalOpen ? old('loser_score', $match->loser_score) : $match->loser_score }}" required>
+                            @if($matchErrorBag->has('loser_score'))
+                                <div class="field-error">{{ $matchErrorBag->first('loser_score') }}</div>
+                            @endif
                         </div>
                         <div class="col-12">
                             <label for="edit_game_type_{{ $match->id }}" class="form-label">Game Type</label>
-                            <input id="edit_game_type_{{ $match->id }}" type="text" name="game_type" class="form-control" value="{{ $match->game_type }}" placeholder="Example: UNO">
+                            <input id="edit_game_type_{{ $match->id }}" type="text" name="game_type" class="form-control @if($matchErrorBag->has('game_type')) is-invalid @endif" value="{{ $isMatchModalOpen ? old('game_type', $match->game_type) : $match->game_type }}" placeholder="Example: UNO">
+                            @if($matchErrorBag->has('game_type'))
+                                <div class="field-error">{{ $matchErrorBag->first('game_type') }}</div>
+                            @endif
                         </div>
                     </div>
                 </div>
@@ -408,11 +439,28 @@
 @push('scripts')
 <script>
     const refreshButton = document.getElementById('refresh-dashboard');
+    const modalToReopen = @json(session('openModal'));
 
     refreshButton?.addEventListener('click', () => {
         refreshButton.disabled = true;
         refreshButton.innerHTML = '<span class="spinner-border spinner-border-sm me-2" aria-hidden="true"></span>Updating';
         window.location.reload();
     });
+
+    if (modalToReopen && window.bootstrap) {
+        const modalElement = document.getElementById(modalToReopen);
+
+        if (modalElement) {
+            const firstInvalidField = modalElement.querySelector('.is-invalid');
+
+            if (firstInvalidField) {
+                modalElement.addEventListener('shown.bs.modal', () => {
+                    firstInvalidField.focus();
+                }, { once: true });
+            }
+
+            window.bootstrap.Modal.getOrCreateInstance(modalElement).show();
+        }
+    }
 </script>
 @endpush
