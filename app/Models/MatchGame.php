@@ -3,7 +3,17 @@
 namespace App\Models;
 
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
+/**
+ * @property int $id
+ * @property int $winner_id
+ * @property int $loser_id
+ * @property int $winner_score
+ * @property int $loser_score
+ * @property string|null $game_type
+ * @property \Illuminate\Support\Carbon $played_at
+ */
 class MatchGame extends Model
 {
     // Columns that can be mass-assigned
@@ -22,13 +32,13 @@ class MatchGame extends Model
     ];
 
     // The participant who won this match
-    public function winner()
+    public function winner(): BelongsTo
     {
         return $this->belongsTo(Participant::class, 'winner_id');
     }
 
     // The participant who lost this match
-    public function loser()
+    public function loser(): BelongsTo
     {
         return $this->belongsTo(Participant::class, 'loser_id');
     }

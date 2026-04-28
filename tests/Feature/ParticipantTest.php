@@ -12,6 +12,7 @@ class ParticipantTest extends TestCase
 {
     use RefreshDatabase;
 
+    // This proves the add participant form creates a new participant row.
     public function test_a_participant_can_be_created(): void
     {
         $response = $this->post('/participants', [
@@ -32,6 +33,7 @@ class ParticipantTest extends TestCase
         ]);
     }
 
+    // This proves the edit participant flow updates the saved data.
     public function test_a_participant_can_be_updated(): void
     {
         $participant = Participant::create([
@@ -54,6 +56,7 @@ class ParticipantTest extends TestCase
         ]);
     }
 
+    // This proves validation errors reopen the same participant edit modal.
     public function test_failed_participant_update_reopens_the_matching_modal_with_errors(): void
     {
         $participant = Participant::create([
@@ -81,6 +84,7 @@ class ParticipantTest extends TestCase
         ]);
     }
 
+    // This proves deleting a participant also removes related matches and fixes the standings.
     public function test_a_participant_can_be_deleted_and_related_matches_are_removed(): void
     {
         $winner = Participant::create([

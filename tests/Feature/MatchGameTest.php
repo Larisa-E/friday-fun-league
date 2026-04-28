@@ -12,6 +12,7 @@ class MatchGameTest extends TestCase
 {
     use RefreshDatabase;
 
+    // This checks the main validation rule that winner and loser cannot be the same person.
     public function test_match_validation_rejects_the_same_participant_as_winner_and_loser(): void
     {
         $participant = Participant::create([
@@ -32,6 +33,7 @@ class MatchGameTest extends TestCase
         $this->assertDatabaseCount('match_games', 0);
     }
 
+    // This proves a new match is saved and the standings are recalculated.
     public function test_a_match_can_be_recorded_and_updates_standings(): void
     {
         $winner = Participant::create([
@@ -77,6 +79,7 @@ class MatchGameTest extends TestCase
         $this->assertSame(1, $loser->matches_played);
     }
 
+    // This proves editing a match also updates the standings correctly.
     public function test_a_match_can_be_updated_and_recalculates_standings(): void
     {
         $alice = Participant::create([
@@ -134,6 +137,7 @@ class MatchGameTest extends TestCase
         $this->assertSame(1, $bob->matches_played);
     }
 
+    // This proves validation errors reopen the correct edit modal after redirect.
     public function test_failed_match_update_reopens_the_matching_modal_with_errors(): void
     {
         $alice = Participant::create([
@@ -168,6 +172,7 @@ class MatchGameTest extends TestCase
         $response->assertSessionHas('openModal', 'editMatchModal' . $match->id);
     }
 
+    // This proves deleting a match removes it and recalculates the standings.
     public function test_a_match_can_be_deleted_and_recalculates_standings(): void
     {
         $winner = Participant::create([

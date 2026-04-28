@@ -1,6 +1,14 @@
-const statsNode = document.getElementById('stats-data');
+// This function builds the charts after Chart.js is ready on the stats page.
+const initStatsCharts = () => {
+    const statsNode = document.getElementById('stats-data');
 
-if (statsNode && window.Chart) {
+    // Stop here if the page has no stats data, Chart.js is not ready, or the charts already exist.
+    if (!statsNode || !window.Chart || statsNode.dataset.chartsInitialized === 'true') {
+        return;
+    }
+
+    statsNode.dataset.chartsInitialized = 'true';
+
     const payload = JSON.parse(statsNode.dataset.payload ?? '{}');
     const {
         participantLabels = [],
@@ -10,6 +18,7 @@ if (statsNode && window.Chart) {
         gameTotals = [],
     } = payload;
 
+    // Use a small color list so both charts keep the same style.
     const pointColors = ['#007bff', '#3b91ff', '#63a8ff', '#8bbfff', '#b3d5ff', '#dbe9ff'];
     const gameColors = ['#007bff', '#004080', '#6c757d', '#adb5bd', '#dee2e6', '#ff4d4d'];
 
@@ -17,6 +26,7 @@ if (statsNode && window.Chart) {
     const gameTypeCanvas = document.getElementById('gameTypeChart');
 
     if (pointsCanvas) {
+        // Bar chart for points and wins.
         new Chart(pointsCanvas, {
             type: 'bar',
             data: {
@@ -57,6 +67,7 @@ if (statsNode && window.Chart) {
     }
 
     if (gameTypeCanvas) {
+        // Doughnut chart for game types.
         new Chart(gameTypeCanvas, {
             type: 'doughnut',
             data: {
@@ -80,4 +91,7 @@ if (statsNode && window.Chart) {
             },
         });
     }
-}
+};
+
+window.initStatsCharts = initStatsCharts;
+initStatsCharts();

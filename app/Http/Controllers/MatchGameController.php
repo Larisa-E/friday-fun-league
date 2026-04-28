@@ -10,7 +10,7 @@ use Illuminate\Support\Facades\Validator;
 
 class MatchGameController extends Controller
 {
-    // register match form submission
+    // Create a new match result and then recalculate the standings.
     public function store(Request $request, LeagueStatsService $leagueStats)
     {
         $validated = $request->validate([
@@ -33,6 +33,7 @@ class MatchGameController extends Controller
         return redirect()->route('dashboard')->with('success', 'Match recorded successfully!');
     }
 
+    // Update one match and reopen the same edit modal if validation fails.
     public function update(Request $request, MatchGame $match, LeagueStatsService $leagueStats)
     {
         $validator = Validator::make($request->all(), [
@@ -61,6 +62,7 @@ class MatchGameController extends Controller
         return redirect()->route('dashboard')->with('success', 'Match updated successfully!');
     }
 
+    // Delete one match result and recalculate the standings afterwards.
     public function destroy(MatchGame $match, LeagueStatsService $leagueStats)
     {
         DB::transaction(function () use ($match, $leagueStats): void {

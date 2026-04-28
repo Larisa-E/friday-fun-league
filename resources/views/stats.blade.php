@@ -2,6 +2,7 @@
 
 @section('content')
 
+{{-- This page shows statistics, charts, and simple facts about the tournament. --}}
 <div class="feature-header">
     <div>
         <h1 class="section-heading mb-1">Statistics</h1>
@@ -10,6 +11,7 @@
     <a href="{{ route('dashboard') }}" class="btn btn-outline-secondary">Back to Dashboard</a>
 </div>
 
+{{-- These top boxes show the main numbers before the charts load. --}}
 <div class="row g-4 mb-4">
     <div class="col-md-6 col-xl-3">
         <div class="stat-tile tile-blue">
@@ -37,6 +39,7 @@
     </div>
 </div>
 
+{{-- The charts below use lazy loading, so the text shows first and the charts load later. --}}
 <div class="row g-4">
     <div class="col-xl-8">
         <div class="card chart-card">
@@ -164,6 +167,7 @@
 @endsection
 
 @php
+    // Save the PHP statistics as JSON so the chart script can use them later.
     $statsPayload = json_encode([
         'participantLabels' => $participants->pluck('name')->values(),
         'participantPoints' => $participants->pluck('points')->values(),
@@ -174,11 +178,95 @@
 @endphp
 
 @push('scripts')
+{{-- Save the chart data and script links in the page, but do not load the chart library yet. --}}
 <div
     id="stats-data"
     hidden
     data-payload="{{ $statsPayload }}"
+    data-chart-js-url="https://cdn.jsdelivr.net/npm/chart.js"
+    data-stats-js-url="{{ asset('js/stats.js') }}"
 ></div>
-<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-<script src="{{ asset('js/stats.js') }}"></script>
+<script>
+    (() => {
+        // This loader waits until the chart area is near, then it loads Chart.js and the chart code.
+        const statsNode = document.getElementById('stats-data');
+        const chartAnchor = document.getElementById('pointsChart');
+
+        if (!statsNode || !chartAnchor) {
+            return;
+        }
+
+        const chartJsUrl = statsNode.dataset.chartJsUrl ?? '';
+        const statsScriptUrl = statsNode.dataset.statsJsUrl ?? '';
+        let chartsRequested = false;
+
+        // Reuse the same script tag if it was already loaded before.
+        const loadScript = (src) => new Promise((resolve, reject) => {
+            if (!src) {
+                reject(new Error('Missing script URL.'));
+                return;
+            }
+
+            const existingScript = document.querySelector(`script[src="${src}"]`);
+
+            if (existingScript) {
+                if (existingScript.dataset.loaded === 'true' || (src === statsScriptUrl && window.initStatsCharts)) {
+                    resolve();
+                    return;
+                }
+
+                existingScript.addEventListener('load', () => resolve(), { once: true });
+                existingScript.addEventListener('error', () => reject(new Error(`Could not load ${src}`)), { once: true });
+                return;
+            }
+
+            const script = document.createElement('script');
+            script.src = src;
+            script.async = true;
+            script.addEventListener('load', () => {
+                script.dataset.loaded = 'true';
+                resolve();
+            }, { once: true });
+            script.addEventListener('error', () => reject(new Error(`Could not load ${src}`)), { once: true });
+            document.body.appendChild(script);
+        });
+
+        const loadCharts = async () => {
+            if (chartsRequested) {
+                return;
+            }
+
+            chartsRequested = true;
+
+            try {
+                if (!window.Chart) {
+                    await loadScript(chartJsUrl);
+                }
+
+                if (!window.initStatsCharts) {
+                    await loadScript(statsScriptUrl);
+                }
+
+                window.initStatsCharts?.();
+            } catch (error) {
+                console.error('Could not lazy load the statistics charts.', error);
+            }
+        };
+
+        // Only load the chart files when the chart area gets close to the screen.
+        if ('IntersectionObserver' in window) {
+            const observer = new IntersectionObserver((entries) => {
+                if (entries.some((entry) => entry.isIntersecting)) {
+                    observer.disconnect();
+                    void loadCharts();
+                }
+            }, { rootMargin: '120px 0px' });
+
+            observer.observe(chartAnchor);
+            return;
+        }
+
+        void loadCharts();
+    })();
+</script>
 @endpush

@@ -10,11 +10,11 @@ use Illuminate\Support\Facades\Validator;
 
 class ParticipantController extends Controller
 {
-    // add participant form submission
+    // Create a new participant from the dashboard form.
     public function store(Request $request)
     {
         $request->validate([
-            'name' => 'required|string|max:100|unique:participants,name', // name is required and must not already exist in the table  
+            'name' => 'required|string|max:100|unique:participants,name',
             'avatar_emoji' => 'nullable|max:10',
         ]);
 
@@ -26,6 +26,7 @@ class ParticipantController extends Controller
         return redirect()->route('dashboard')->with('success', 'Participant ' . $request->name . ' added successfully!');
     }
 
+    // Update one participant and send validation errors back to the correct edit modal.
     public function update(Request $request, Participant $participant)
     {
         $validator = Validator::make($request->all(), [
@@ -48,6 +49,7 @@ class ParticipantController extends Controller
         return redirect()->route('dashboard')->with('success', 'Participant updated successfully!');
     }
 
+    // Delete the participant and recalculate standings so the rank list stays correct.
     public function destroy(Participant $participant, LeagueStatsService $leagueStats)
     {
         DB::transaction(function () use ($participant, $leagueStats): void {
