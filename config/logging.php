@@ -73,6 +73,15 @@ return [
             'replace_placeholders' => true,
         ],
 
+        // Keep participant and match activity in its own easy-to-read file.
+        'league' => [
+            'driver' => 'daily',
+            'path' => storage_path('logs/league.log'),
+            'level' => env('LOG_LEVEL', 'info'),
+            'days' => env('LOG_DAILY_DAYS', 14),
+            'replace_placeholders' => true,
+        ],
+
         'slack' => [
             'driver' => 'slack',
             'url' => env('LOG_SLACK_WEBHOOK_URL'),

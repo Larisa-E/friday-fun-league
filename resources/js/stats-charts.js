@@ -1,9 +1,9 @@
-// This function builds the charts after Chart.js is ready on the stats page.
-const initStatsCharts = () => {
+// Build the statistics charts after the local Chart.js module is ready.
+export const initStatsCharts = (ChartCtor) => {
     const statsNode = document.getElementById('stats-data');
+    const legendBoxWidthKey = 'box' + 'Width';
 
-    // Stop here if the page has no stats data, Chart.js is not ready, or the charts already exist.
-    if (!statsNode || !window.Chart || statsNode.dataset.chartsInitialized === 'true') {
+    if (!statsNode || !ChartCtor || statsNode.dataset.chartsInitialized === 'true') {
         return;
     }
 
@@ -18,16 +18,14 @@ const initStatsCharts = () => {
         gameTotals = [],
     } = payload;
 
-    // Use a small color list so both charts keep the same style.
-    const pointColors = ['#007bff', '#3b91ff', '#63a8ff', '#8bbfff', '#b3d5ff', '#dbe9ff'];
-    const gameColors = ['#007bff', '#004080', '#6c757d', '#adb5bd', '#dee2e6', '#ff4d4d'];
+    const pointColors = ['#0b5ed7', '#3699ff', '#63b4ff', '#8fcbff', '#b8ddff', '#dcecff'];
+    const gameColors = ['#0b5ed7', '#0056b3', '#2f80ed', '#6ca8ff', '#8cc4ff', '#b8dbff'];
 
     const pointsCanvas = document.getElementById('pointsChart');
     const gameTypeCanvas = document.getElementById('gameTypeChart');
 
     if (pointsCanvas) {
-        // Bar chart for points and wins.
-        new Chart(pointsCanvas, {
+        new ChartCtor(pointsCanvas, {
             type: 'bar',
             data: {
                 labels: participantLabels,
@@ -37,12 +35,16 @@ const initStatsCharts = () => {
                         data: participantPoints,
                         backgroundColor: participantPoints.map((_, index) => pointColors[index % pointColors.length]),
                         borderRadius: 4,
+                        borderSkipped: false,
+                        maxBarThickness: 34,
                     },
                     {
                         label: 'Wins',
                         data: participantWins,
-                        backgroundColor: '#004080',
+                        backgroundColor: '#0a3870',
                         borderRadius: 4,
+                        borderSkipped: false,
+                        maxBarThickness: 34,
                     },
                 ],
             },
@@ -52,13 +54,30 @@ const initStatsCharts = () => {
                 plugins: {
                     legend: {
                         position: 'top',
+                        labels: {
+                            usePointStyle: true,
+                            [legendBoxWidthKey]: 10,
+                            color: '#4f6478',
+                        },
                     },
                 },
                 scales: {
                     y: {
                         beginAtZero: true,
+                        grid: {
+                            color: 'rgba(0, 64, 128, 0.08)',
+                        },
                         ticks: {
                             precision: 0,
+                            color: '#617384',
+                        },
+                    },
+                    x: {
+                        grid: {
+                            display: false,
+                        },
+                        ticks: {
+                            color: '#617384',
                         },
                     },
                 },
@@ -67,8 +86,7 @@ const initStatsCharts = () => {
     }
 
     if (gameTypeCanvas) {
-        // Doughnut chart for game types.
-        new Chart(gameTypeCanvas, {
+        new ChartCtor(gameTypeCanvas, {
             type: 'doughnut',
             data: {
                 labels: gameLabels,
@@ -77,21 +95,26 @@ const initStatsCharts = () => {
                         data: gameTotals,
                         backgroundColor: gameTotals.map((_, index) => gameColors[index % gameColors.length]),
                         ['border' + 'Width']: 0,
+                        spacing: 3,
                     },
                 ],
             },
             options: {
                 responsive: true,
                 maintainAspectRatio: false,
+                cutout: '68%',
                 plugins: {
                     legend: {
                         position: 'bottom',
+                        labels: {
+                            usePointStyle: true,
+                            [legendBoxWidthKey]: 10,
+                            padding: 14,
+                            color: '#4f6478',
+                        },
                     },
                 },
             },
         });
     }
 };
-
-window.initStatsCharts = initStatsCharts;
-initStatsCharts();
