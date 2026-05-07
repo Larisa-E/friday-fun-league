@@ -18,8 +18,8 @@ export const initStatsCharts = (ChartCtor) => {
         gameTotals = [],
     } = payload;
 
-    const pointColors = ['#0b5ed7', '#3699ff', '#63b4ff', '#8fcbff', '#b8ddff', '#dcecff'];
-    const gameColors = ['#0b5ed7', '#0056b3', '#2f80ed', '#6ca8ff', '#8cc4ff', '#b8dbff'];
+    const pointColors = ['#0f63c8', '#2580ef', '#4b9eef', '#74b6f1', '#9bcdf1', '#cfe4f8'];
+    const gameColors = ['#0c5fbf', '#104b86', '#2276ca', '#5a98d6', '#8eb8dd', '#d3e4f3'];
 
     const pointsCanvas = document.getElementById('pointsChart');
     const gameTypeCanvas = document.getElementById('gameTypeChart');
@@ -34,17 +34,17 @@ export const initStatsCharts = (ChartCtor) => {
                         label: 'Points',
                         data: participantPoints,
                         backgroundColor: participantPoints.map((_, index) => pointColors[index % pointColors.length]),
-                        borderRadius: 4,
+                        borderRadius: 8,
                         borderSkipped: false,
-                        maxBarThickness: 34,
+                        maxBarThickness: 32,
                     },
                     {
                         label: 'Wins',
                         data: participantWins,
-                        backgroundColor: '#0a3870',
-                        borderRadius: 4,
+                        backgroundColor: '#143f72',
+                        borderRadius: 8,
                         borderSkipped: false,
-                        maxBarThickness: 34,
+                        maxBarThickness: 32,
                     },
                 ],
             },
@@ -57,7 +57,7 @@ export const initStatsCharts = (ChartCtor) => {
                         labels: {
                             usePointStyle: true,
                             [legendBoxWidthKey]: 10,
-                            color: '#4f6478',
+                            color: '#48627c',
                         },
                     },
                 },
@@ -65,11 +65,11 @@ export const initStatsCharts = (ChartCtor) => {
                     y: {
                         beginAtZero: true,
                         grid: {
-                            color: 'rgba(0, 64, 128, 0.08)',
+                            color: 'rgba(20, 63, 114, 0.09)',
                         },
                         ticks: {
                             precision: 0,
-                            color: '#617384',
+                            color: '#5f7387',
                         },
                     },
                     x: {
@@ -77,7 +77,7 @@ export const initStatsCharts = (ChartCtor) => {
                             display: false,
                         },
                         ticks: {
-                            color: '#617384',
+                            color: '#5f7387',
                         },
                     },
                 },
@@ -95,14 +95,14 @@ export const initStatsCharts = (ChartCtor) => {
                         data: gameTotals,
                         backgroundColor: gameTotals.map((_, index) => gameColors[index % gameColors.length]),
                         ['border' + 'Width']: 0,
-                        spacing: 3,
+                        spacing: 4,
                     },
                 ],
             },
             options: {
                 responsive: true,
                 maintainAspectRatio: false,
-                cutout: '68%',
+                cutout: '72%',
                 plugins: {
                     legend: {
                         position: 'bottom',
@@ -110,7 +110,7 @@ export const initStatsCharts = (ChartCtor) => {
                             usePointStyle: true,
                             [legendBoxWidthKey]: 10,
                             padding: 14,
-                            color: '#4f6478',
+                            color: '#48627c',
                         },
                     },
                 },

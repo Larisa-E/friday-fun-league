@@ -159,7 +159,7 @@ class DashboardTest extends TestCase
         $response->assertOk();
         $response->assertSeeText('Statistics');
         $response->assertSeeText('Matches Played');
-        $response->assertSeeText('Top Player');
+        $response->assertSeeText('Standings Snapshot');
         $response->assertSeeText('Alice');
         $response->assertViewHas('summary', function (array $summary) {
             return $summary['participants'] === 2

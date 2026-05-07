@@ -50,7 +50,7 @@
                 </span>
                 <span>Statistics</span>
             </a>
-            <button id="refresh-dashboard" type="button" class="btn btn-primary">
+            <button id="refresh-dashboard" type="button" class="btn btn-primary" aria-controls="leaderboard-body latest-matches-body">
                 <span class="button-icon" aria-hidden="true">
                     <x-icon name="refresh" />
                 </span>
@@ -144,6 +144,7 @@
                         id="load-more-leaderboard"
                         type="button"
                         class="btn btn-outline-primary"
+                        aria-controls="leaderboard-body"
                         @if($leaderboardParticipants->count() >= $totalLeaderboardParticipants) disabled @endif
                     >
                         @if($leaderboardParticipants->count() >= $totalLeaderboardParticipants)
@@ -156,7 +157,7 @@
                         @endif
                     </button>
 
-                    <div id="leaderboard-load-more-status" class="text-muted small">
+                    <div id="leaderboard-load-more-status" class="text-muted small" role="status" aria-live="polite" aria-atomic="true">
                         @if($totalLeaderboardParticipants === 0)
                             No players yet.
                         @elseif($leaderboardParticipants->count() >= $totalLeaderboardParticipants)
@@ -177,35 +178,22 @@
                 <p class="muted-note mb-0">Newest results are shown first.</p>
             </div>
             <div class="card-body p-0">
-                <div class="table-responsive">
-                    <table class="table table-hover mb-0 dashboard-table dashboard-table-matches">
-                        <thead>
-                            <tr>
-                                <th>When</th>
-                                <th>Result</th>
-                                <th>Game</th>
-                            </tr>
-                        </thead>
-                        <tbody id="latest-matches-body">
-                            @forelse($latestMatches as $match)
-                            <tr>
-                                <td class="text-muted small">{{ $match->played_at->format('d M Y H:i') }}</td>
-                                <td>
-                                    <div class="match-result-line">
-                                        <span class="fw-bold text-dark">{{ $match->winner->name }}</span>
-                                        <span class="score-badge mx-1">{{ $match->winner_score }} - {{ $match->loser_score }}</span>
-                                        <span class="text-muted">{{ $match->loser->name }}</span>
-                                    </div>
-                                </td>
-                                <td class="text-muted small">{{ $match->game_type ?? 'Unspecified' }}</td>
-                            </tr>
-                            @empty
-                            <tr>
-                                <td colspan="3" class="empty-state">No matches yet.</td>
-                            </tr>
-                            @endforelse
-                        </tbody>
-                    </table>
+                <div id="latest-matches-body" class="match-stack latest-match-stack" role="list">
+                    @forelse($latestMatches as $match)
+                    <article class="match-tile match-tile-latest" role="listitem">
+                        <div class="match-latest-header">
+                            <span class="match-latest-game">{{ $match->game_type ?? 'Unspecified' }}</span>
+                            <span class="match-latest-time">{{ $match->played_at->format('d M Y H:i') }}</span>
+                        </div>
+                        <div class="match-tile-main match-latest-scoreline">
+                            <span class="match-player match-player-winner">{{ $match->winner->name }}</span>
+                            <span class="score-badge match-score-badge">{{ $match->winner_score }} - {{ $match->loser_score }}</span>
+                            <span class="match-player match-player-loser">{{ $match->loser->name }}</span>
+                        </div>
+                    </article>
+                    @empty
+                    <div class="empty-state">No matches yet.</div>
+                    @endforelse
                 </div>
             </div>
         </div>
@@ -260,12 +248,17 @@
 
     {{-- These forms are used to add new participants and new match results. --}}
     <div class="col-12 col-lg-6 deferred-panel">
-        <div class="card participant-card">
-            <div class="card-header">
+        <div class="card participant-card workspace-panel-card workspace-panel-card-add">
+            <div class="card-header workspace-panel-header">
+                <span class="panel-kicker">Quick Setup</span>
                 <h2 class="section-heading card-heading mb-1">Add Participant</h2>
                 <p class="muted-note mb-0">Create a new player for the league.</p>
             </div>
             <div class="card-body">
+                <div class="panel-guidance" aria-hidden="true">
+                    <span class="panel-guidance-chip">Name required</span>
+                    <span class="panel-guidance-chip">Emoji optional</span>
+                </div>
                 <form action="{{ route('participants.store') }}" method="POST" class="dashboard-form" novalidate>
                     @csrf
                     <div class="dashboard-form-group">
@@ -282,6 +275,7 @@
                             <div class="field-error">{{ $message }}</div>
                         @enderror
                     </div>
+                    <p class="form-submit-note mb-0">New players appear in the leaderboard immediately.</p>
                     <button type="submit" class="btn btn-primary w-100">
                         <span class="button-icon" aria-hidden="true">
                             <x-icon name="user-plus" />
@@ -294,12 +288,17 @@
     </div>
 
     <div class="col-12 col-lg-6 deferred-panel">
-        <div class="card match-form-card">
-            <div class="card-header">
+        <div class="card match-form-card workspace-panel-card workspace-panel-card-match">
+            <div class="card-header workspace-panel-header">
+                <span class="panel-kicker">Record Result</span>
                 <h2 class="section-heading card-heading mb-1">Register Match</h2>
                 <p class="muted-note mb-0">Record the winner, loser, score, and game type.</p>
             </div>
             <div class="card-body">
+                <div class="panel-guidance" aria-hidden="true">
+                    <span class="panel-guidance-chip">Winner and loser</span>
+                    <span class="panel-guidance-chip">Scores required</span>
+                </div>
                 <form action="{{ route('matches.store') }}" method="POST" class="dashboard-form" novalidate>
                     @csrf
                     <div class="dashboard-form-group">
@@ -353,6 +352,7 @@
                             <div class="field-error">{{ $message }}</div>
                         @enderror
                     </div>
+                    <p class="form-submit-note mb-0">Each saved result updates points and history automatically.</p>
                     <button type="submit" class="btn btn-success w-100">
                         <span class="button-icon" aria-hidden="true">
                             <x-icon name="clipboard-plus" />
@@ -378,69 +378,65 @@
 
     {{-- These sections let the user edit or delete saved data. --}}
     <div class="col-12 deferred-panel">
-        <div class="card participant-card">
+        <div class="card participant-card participant-roster-card">
             <div class="card-header">
                 <h2 class="section-heading card-heading mb-1">Manage Participants</h2>
                 <p class="muted-note mb-0">Edit names or delete participants when needed.</p>
             </div>
-            <div class="card-body p-0">
-                <div class="table-responsive">
-                    <table class="table table-hover mb-0 dashboard-table dashboard-table-manage">
-                        <thead>
-                            <tr>
-                                <th>Player</th>
-                                <th>Points</th>
-                                <th>Matches</th>
-                                <th>Actions</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            @forelse($participants as $participant)
-                            <tr>
-                                <td>
-                                    <span class="player-line">
-                                        <span class="player-avatar">{{ $participant->avatar_emoji ?: strtoupper(substr($participant->name, 0, 1)) }}</span>
-                                        <span class="fw-semibold player-name">{{ $participant->name }}</span>
+            <div class="card-body participant-roster-body">
+                <div class="participant-roster" role="list">
+                    @forelse($participants as $participant)
+                    <article class="participant-tile" role="listitem">
+                        <div class="participant-tile-head">
+                            <div class="participant-tile-player-wrap">
+                                <span class="player-line participant-tile-player">
+                                    <span class="player-avatar">{{ $participant->avatar_emoji ?: strtoupper(substr($participant->name, 0, 1)) }}</span>
+                                    <span class="fw-semibold player-name">{{ $participant->name }}</span>
+                                </span>
+                                <span class="participant-secondary-note">Ready for editing or removal.</span>
+                            </div>
+                            <span class="participant-points-pill">{{ $participant->points }} pts</span>
+                        </div>
+                        <div class="participant-tile-stats">
+                            <div class="participant-stat">
+                                <span class="participant-stat-label">Points</span>
+                                <strong>{{ $participant->points }}</strong>
+                            </div>
+                            <div class="participant-stat">
+                                <span class="participant-stat-label">Matches</span>
+                                <strong>{{ $participant->matches_played }}</strong>
+                            </div>
+                        </div>
+                        <div class="table-actions participant-tile-actions">
+                            <button
+                                type="button"
+                                class="btn btn-sm btn-outline-secondary edit-participant-button"
+                                data-bs-toggle="modal"
+                                data-bs-target="#editParticipantModal"
+                                data-participant-id="{{ $participant->id }}"
+                                data-participant-name="{{ $participant->name }}"
+                                data-participant-avatar="{{ $participant->avatar_emoji ?? '' }}"
+                            >
+                                <span class="button-icon" aria-hidden="true">
+                                    <x-icon name="pencil" />
+                                </span>
+                                <span>Edit</span>
+                            </button>
+                            <form action="{{ route('participants.destroy', $participant) }}" method="POST" onsubmit="return confirm('Delete this participant? Their matches will also be removed.')">
+                                @csrf
+                                @method('DELETE')
+                                <button type="submit" class="btn btn-sm btn-outline-danger">
+                                    <span class="button-icon" aria-hidden="true">
+                                        <x-icon name="trash" />
                                     </span>
-                                </td>
-                                <td>{{ $participant->points }}</td>
-                                <td>{{ $participant->matches_played }}</td>
-                                <td>
-                                    <div class="table-actions">
-                                        <button
-                                            type="button"
-                                            class="btn btn-sm btn-outline-secondary edit-participant-button"
-                                            data-bs-toggle="modal"
-                                            data-bs-target="#editParticipantModal"
-                                            data-participant-id="{{ $participant->id }}"
-                                            data-participant-name="{{ $participant->name }}"
-                                            data-participant-avatar="{{ $participant->avatar_emoji ?? '' }}"
-                                        >
-                                            <span class="button-icon" aria-hidden="true">
-                                                <x-icon name="pencil" />
-                                            </span>
-                                            <span>Edit</span>
-                                        </button>
-                                        <form action="{{ route('participants.destroy', $participant) }}" method="POST" onsubmit="return confirm('Delete this participant? Their matches will also be removed.')">
-                                            @csrf
-                                            @method('DELETE')
-                                            <button type="submit" class="btn btn-sm btn-outline-danger">
-                                                <span class="button-icon" aria-hidden="true">
-                                                    <x-icon name="trash" />
-                                                </span>
-                                                <span>Delete</span>
-                                            </button>
-                                        </form>
-                                    </div>
-                                </td>
-                            </tr>
-                            @empty
-                            <tr>
-                                <td colspan="4" class="empty-state">No participants to manage yet.</td>
-                            </tr>
-                            @endforelse
-                        </tbody>
-                    </table>
+                                    <span>Delete</span>
+                                </button>
+                            </form>
+                        </div>
+                    </article>
+                    @empty
+                    <div class="empty-state">No participants to manage yet.</div>
+                    @endforelse
                 </div>
             </div>
         </div>
@@ -467,81 +463,67 @@
                             @endforeach
                         </select>
                     </div>
-                    <button type="submit" class="btn btn-primary">
-                        <span class="button-icon" aria-hidden="true">
-                            <x-icon name="filter" />
-                        </span>
-                        <span>Apply Filters</span>
-                    </button>
-                    <a href="{{ route('dashboard') }}" class="btn btn-outline-secondary">
-                        <span class="button-icon" aria-hidden="true">
-                            <x-icon name="x" />
-                        </span>
-                        <span>Clear</span>
-                    </a>
+                    <div class="filter-actions">
+                        <button type="submit" class="btn btn-primary">
+                            <span class="button-icon" aria-hidden="true">
+                                <x-icon name="filter" />
+                            </span>
+                            <span>Apply Filters</span>
+                        </button>
+                        <a href="{{ route('dashboard') }}" class="btn btn-outline-secondary">
+                            <span class="button-icon" aria-hidden="true">
+                                <x-icon name="x" />
+                            </span>
+                            <span>Clear</span>
+                        </a>
+                    </div>
                 </form>
 
-                <div class="table-responsive">
-                    <table class="table table-hover mb-0 dashboard-table dashboard-table-history">
-                        <thead>
-                            <tr>
-                                <th>When</th>
-                                <th>Result</th>
-                                <th>Game</th>
-                                <th>Actions</th>
-                            </tr>
-                        </thead>
-                        <tbody id="match-history-body">
-                            @forelse($matchHistory as $match)
-                            <tr>
-                                <td class="text-muted small">{{ $match->played_at->format('d M Y H:i') }}</td>
-                                <td>
-                                    <div class="match-result-line">
-                                        <span class="fw-bold text-dark">{{ $match->winner->name }}</span>
-                                        <span class="score-badge mx-1">{{ $match->winner_score }} - {{ $match->loser_score }}</span>
-                                        <span class="text-muted">{{ $match->loser->name }}</span>
-                                    </div>
-                                </td>
-                                <td class="text-muted small">{{ $match->game_type ?? 'Unspecified' }}</td>
-                                <td>
-                                    <div class="table-actions">
-                                        <button
-                                            type="button"
-                                            class="btn btn-sm btn-outline-secondary edit-match-button"
-                                            data-bs-toggle="modal"
-                                            data-bs-target="#editMatchModal"
-                                            data-match-id="{{ $match->id }}"
-                                            data-winner-id="{{ $match->winner_id }}"
-                                            data-loser-id="{{ $match->loser_id }}"
-                                            data-winner-score="{{ $match->winner_score }}"
-                                            data-loser-score="{{ $match->loser_score }}"
-                                            data-game-type="{{ $match->game_type ?? '' }}"
-                                        >
-                                            <span class="button-icon" aria-hidden="true">
-                                                <x-icon name="pencil" />
-                                            </span>
-                                            <span>Edit</span>
-                                        </button>
-                                        <form action="{{ route('matches.destroy', $match) }}" method="POST" onsubmit="return confirm('Delete this match result?')">
-                                            @csrf
-                                            @method('DELETE')
-                                            <button type="submit" class="btn btn-sm btn-outline-danger">
-                                                <span class="button-icon" aria-hidden="true">
-                                                    <x-icon name="trash" />
-                                                </span>
-                                                <span>Delete</span>
-                                            </button>
-                                        </form>
-                                    </div>
-                                </td>
-                            </tr>
-                            @empty
-                            <tr>
-                                <td colspan="4" class="empty-state">No matches matched your filter yet.</td>
-                            </tr>
-                            @endforelse
-                        </tbody>
-                    </table>
+                <div id="match-history-body" class="match-stack history-match-stack" role="list">
+                    @forelse($matchHistory as $match)
+                    <article class="match-tile match-tile-manage" role="listitem">
+                        <div class="match-tile-meta">
+                            <span class="match-meta-pill">{{ $match->played_at->format('d M Y H:i') }}</span>
+                            <span class="match-meta-pill">{{ $match->game_type ?? 'Unspecified' }}</span>
+                        </div>
+                        <div class="match-tile-main">
+                            <span class="match-player match-player-winner">{{ $match->winner->name }}</span>
+                            <span class="score-badge match-score-badge">{{ $match->winner_score }} - {{ $match->loser_score }}</span>
+                            <span class="match-player match-player-loser">{{ $match->loser->name }}</span>
+                        </div>
+                        <div class="table-actions match-card-actions">
+                            <button
+                                type="button"
+                                class="btn btn-sm btn-outline-secondary edit-match-button"
+                                data-bs-toggle="modal"
+                                data-bs-target="#editMatchModal"
+                                data-match-id="{{ $match->id }}"
+                                data-winner-id="{{ $match->winner_id }}"
+                                data-loser-id="{{ $match->loser_id }}"
+                                data-winner-score="{{ $match->winner_score }}"
+                                data-loser-score="{{ $match->loser_score }}"
+                                data-game-type="{{ $match->game_type ?? '' }}"
+                            >
+                                <span class="button-icon" aria-hidden="true">
+                                    <x-icon name="pencil" />
+                                </span>
+                                <span>Edit</span>
+                            </button>
+                            <form action="{{ route('matches.destroy', $match) }}" method="POST" onsubmit="return confirm('Delete this match result?')">
+                                @csrf
+                                @method('DELETE')
+                                <button type="submit" class="btn btn-sm btn-outline-danger">
+                                    <span class="button-icon" aria-hidden="true">
+                                        <x-icon name="trash" />
+                                    </span>
+                                    <span>Delete</span>
+                                </button>
+                            </form>
+                        </div>
+                    </article>
+                    @empty
+                    <div class="empty-state">No matches matched your filter yet.</div>
+                    @endforelse
                 </div>
 
                 {{-- Keep the button inside the card so it stays easy to find under the table. --}}
@@ -550,6 +532,7 @@
                         id="load-more-matches"
                         type="button"
                         class="btn btn-outline-primary"
+                        aria-controls="match-history-body"
                         @if($matchHistory->count() >= $totalMatchHistory) disabled @endif
                     >
                         @if($matchHistory->count() >= $totalMatchHistory)
@@ -562,7 +545,7 @@
                         @endif
                     </button>
 
-                    <div id="load-more-status" class="text-muted small">
+                    <div id="load-more-status" class="text-muted small" role="status" aria-live="polite" aria-atomic="true">
                         @if($matchHistory->count() >= $totalMatchHistory)
                             All matching history rows are already shown.
                         @else
@@ -579,6 +562,8 @@
             </div>
         </div>
     </section>
+
+    <div id="dashboard-announcer" class="visually-hidden" aria-live="polite" aria-atomic="true"></div>
 
 {{-- Save the next leaderboard position so JavaScript can ask for the next players. --}}
 <div

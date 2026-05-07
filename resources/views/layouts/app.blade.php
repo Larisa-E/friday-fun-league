@@ -8,14 +8,16 @@
 </head>
 <body>
 
-<nav class="navbar navbar-dark site-nav">
+<a href="#main-content" class="skip-link">Skip to main content</a>
+
+<nav class="navbar navbar-dark site-nav" aria-label="Main navigation">
     <div class="page-shell d-flex justify-content-between align-items-center py-0">
         <a class="navbar-brand" href="{{ url('/') }}">Friday Fun League</a>
         <span class="navbar-subtitle d-none d-md-inline">Tournament Dashboard</span>
     </div>
 </nav>
 
-<div class="page-shell">
+<main id="main-content" class="page-shell">
     @if (session('success'))
         <div class="alert alert-success alert-dismissible fade show" role="alert">
             {{ session('success') }}
@@ -35,7 +37,7 @@
     @endif
 
     @yield('content')
-</div>
+</main>
 
 <div class="toast-container position-fixed top-0 end-0 p-3 app-toast-stack">
     <div id="app-toast" class="toast app-toast border-0" role="status" aria-live="polite" aria-atomic="true">

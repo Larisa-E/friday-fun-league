@@ -10,6 +10,7 @@
     const dashboardDataUrl = dashboardState?.dataset.dashboardUrl ?? '';
     const leaderboardUrl = leaderboardState?.dataset.leaderboardUrl ?? '';
     const modalToReopen = dashboardState?.dataset.openModal ?? '';
+    const statusAnnouncer = document.getElementById('dashboard-announcer');
     const toastElement = document.getElementById('app-toast');
     const toastMessage = document.getElementById('app-toast-message');
     const dashboardScrollKey = 'dashboard-scroll-position';
@@ -22,6 +23,7 @@
             ? 'editMatchModal'
             : modalToReopen;
     const defaultRefreshButtonHtml = refreshButton?.innerHTML ?? 'Refresh';
+    const defaultLeaderboardLoadMoreButtonHtml = leaderboardLoadMoreButton?.innerHTML ?? 'Load more';
 
     const showToast = (message) => {
         if (!toastElement || !toastMessage || !window.bootstrap?.Toast) {
@@ -32,6 +34,30 @@
         window.bootstrap.Toast.getOrCreateInstance(toastElement, {
             delay: 2400,
         }).show();
+    };
+
+    const announceStatus = (message) => {
+        if (!statusAnnouncer || !message) {
+            return;
+        }
+
+        statusAnnouncer.textContent = '';
+        window.setTimeout(() => {
+            statusAnnouncer.textContent = message;
+        }, 30);
+    };
+
+    const setBusyState = (element, isBusy) => {
+        if (!element) {
+            return;
+        }
+
+        if (isBusy) {
+            element.setAttribute('aria-busy', 'true');
+            return;
+        }
+
+        element.removeAttribute('aria-busy');
     };
 
     // Save where the user is on the page before a normal form submit.
@@ -148,7 +174,7 @@
         }
 
         leaderboardLoadMoreButton.disabled = false;
-        leaderboardLoadMoreButton.innerHTML = 'Load more';
+        leaderboardLoadMoreButton.innerHTML = defaultLeaderboardLoadMoreButtonHtml;
         leaderboardLoadMoreStatus.textContent = `Showing ${leaderboardOffset} of ${leaderboardTotal} players.`;
     };
 
@@ -173,20 +199,22 @@
         }
 
         if (!matches.length) {
-            latestMatchesBody.innerHTML = '<tr><td colspan="3" class="empty-state">No matches yet.</td></tr>';
+            latestMatchesBody.innerHTML = '<div class="empty-state">No matches yet.</div>';
             return;
         }
 
         latestMatchesBody.innerHTML = matches.map((match) => `
-            <tr>
-                <td class="text-muted small">${escapeHtml(formatPlayedAt(match.played_at))}</td>
-                <td>
-                    <span class="fw-bold text-dark">${escapeHtml(match.winner?.name ?? 'Unknown')}</span>
-                    <span class="score-badge mx-1">${Number(match.winner_score ?? 0)} - ${Number(match.loser_score ?? 0)}</span>
-                    <span class="text-muted">${escapeHtml(match.loser?.name ?? 'Unknown')}</span>
-                </td>
-                <td class="text-muted small">${escapeHtml(match.game_type || 'Unspecified')}</td>
-            </tr>
+            <article class="match-tile match-tile-latest" role="listitem">
+                <div class="match-latest-header">
+                    <span class="match-latest-game">${escapeHtml(match.game_type || 'Unspecified')}</span>
+                    <span class="match-latest-time">${escapeHtml(formatPlayedAt(match.played_at))}</span>
+                </div>
+                <div class="match-tile-main match-latest-scoreline">
+                    <span class="match-player match-player-winner">${escapeHtml(match.winner?.name ?? 'Unknown')}</span>
+                    <span class="score-badge match-score-badge">${Number(match.winner_score ?? 0)} - ${Number(match.loser_score ?? 0)}</span>
+                    <span class="match-player match-player-loser">${escapeHtml(match.loser?.name ?? 'Unknown')}</span>
+                </div>
+            </article>
         `).join('');
     };
 
@@ -197,7 +225,10 @@
         }
 
         leaderboardLoadMoreButton.disabled = true;
+        leaderboardLoadMoreButton.setAttribute('aria-busy', 'true');
         leaderboardLoadMoreButton.innerHTML = '<span class="spinner-border spinner-border-sm me-2" aria-hidden="true"></span>Loading';
+        setBusyState(leaderboardBody, true);
+        announceStatus('Loading more players.');
 
         try {
             const params = new URLSearchParams({
@@ -231,9 +262,21 @@
             }
 
             updateLeaderboardLoadState();
+            announceStatus(nextParticipants.length > 0
+                ? `Loaded ${nextParticipants.length} more players. Showing ${leaderboardOffset} of ${leaderboardTotal} players.`
+                : 'No additional players were returned.');
         } catch (error) {
-            alert('Could not load more players right now.');
-            updateLeaderboardLoadState();
+            leaderboardLoadMoreButton.disabled = false;
+            leaderboardLoadMoreButton.innerHTML = defaultLeaderboardLoadMoreButtonHtml;
+
+            if (leaderboardLoadMoreStatus) {
+                leaderboardLoadMoreStatus.textContent = 'Could not load more players right now. Try again.';
+            }
+
+            announceStatus('Could not load more players right now. Try again.');
+        } finally {
+            leaderboardLoadMoreButton.removeAttribute('aria-busy');
+            setBusyState(leaderboardBody, false);
         }
     });
 
@@ -243,6 +286,7 @@
         }
 
         refreshButton.disabled = false;
+        refreshButton.removeAttribute('aria-busy');
         refreshButton.innerHTML = defaultRefreshButtonHtml;
     };
 
@@ -257,7 +301,11 @@
 
     refreshButton?.addEventListener('click', async () => {
         refreshButton.disabled = true;
+        refreshButton.setAttribute('aria-busy', 'true');
         refreshButton.innerHTML = '<span class="spinner-border spinner-border-sm me-2" aria-hidden="true"></span>Updating';
+        setBusyState(leaderboardBody, true);
+        setBusyState(latestMatchesBody, true);
+        announceStatus('Updating the dashboard.');
 
         if (!dashboardDataUrl) {
             window.location.reload();
@@ -297,10 +345,14 @@
 
             updateLeaderboardLoadState();
             showToast('Dashboard updated successfully.');
+            announceStatus('Dashboard updated successfully.');
         } catch (error) {
+            announceStatus('Could not update the dashboard in the background. Reloading the page.');
             window.location.reload();
             return;
         } finally {
+            setBusyState(leaderboardBody, false);
+            setBusyState(latestMatchesBody, false);
             setRefreshIdle();
         }
     });
@@ -342,6 +394,7 @@
     const csrfToken = matchHistoryState?.dataset.csrfToken ?? '';
     const totalMatchHistory = Number(matchHistoryState?.dataset.total ?? 0);
     let matchOffset = Number(matchHistoryState?.dataset.offset ?? 0);
+    const defaultMatchLoadMoreButtonHtml = loadMoreButton?.innerHTML ?? 'Load more';
 
     // Put the clicked participant data into the shared participant popup.
     const populateParticipantEditModal = (button) => {
@@ -432,39 +485,39 @@
     // Build the same row layout for the next group of history rows.
     const renderMatchHistoryRows = (matches) => {
         return matches.map((match) => `
-            <tr>
-                <td class="text-muted small">${escapeHtml(formatPlayedAt(match.played_at))}</td>
-                <td>
-                    <span class="fw-bold text-dark">${escapeHtml(match.winner?.name ?? 'Unknown')}</span>
-                    <span class="score-badge mx-1">${Number(match.winner_score ?? 0)} - ${Number(match.loser_score ?? 0)}</span>
-                    <span class="text-muted">${escapeHtml(match.loser?.name ?? 'Unknown')}</span>
-                </td>
-                <td class="text-muted small">${escapeHtml(match.game_type || 'Unspecified')}</td>
-                <td>
-                    <div class="table-actions">
-                        <button
-                            type="button"
-                            class="btn btn-sm btn-outline-secondary edit-match-button"
-                            data-bs-toggle="modal"
-                            data-bs-target="#editMatchModal"
-                            data-match-id="${Number(match.id)}"
-                            data-winner-id="${Number(match.winner_id ?? 0)}"
-                            data-loser-id="${Number(match.loser_id ?? 0)}"
-                            data-winner-score="${Number(match.winner_score ?? 0)}"
-                            data-loser-score="${Number(match.loser_score ?? 0)}"
-                            data-game-type="${escapeHtml(match.game_type || '')}"
-                        >
-                            <span class="button-icon" aria-hidden="true">
-                                <svg viewBox="0 0 16 16" focusable="false">
-                                    <path d="M12.146.854a.5.5 0 0 1 .708 0l2.292 2.292a.5.5 0 0 1 0 .708l-8.5 8.5L4 13l.646-2.646 8.5-8.5ZM3.5 13.5l2.793-.707L2.707 9.207 2 12a1 1 0 0 0 1.5 1.5Z" fill="currentColor"/>
-                                </svg>
-                            </span>
-                            <span>Edit</span>
-                        </button>
-                        ${renderDeleteMatchForm(match.id)}
-                    </div>
-                </td>
-            </tr>
+            <article class="match-tile match-tile-manage" role="listitem">
+                <div class="match-tile-meta">
+                    <span class="match-meta-pill">${escapeHtml(formatPlayedAt(match.played_at))}</span>
+                    <span class="match-meta-pill">${escapeHtml(match.game_type || 'Unspecified')}</span>
+                </div>
+                <div class="match-tile-main">
+                    <span class="match-player match-player-winner">${escapeHtml(match.winner?.name ?? 'Unknown')}</span>
+                    <span class="score-badge match-score-badge">${Number(match.winner_score ?? 0)} - ${Number(match.loser_score ?? 0)}</span>
+                    <span class="match-player match-player-loser">${escapeHtml(match.loser?.name ?? 'Unknown')}</span>
+                </div>
+                <div class="table-actions match-card-actions">
+                    <button
+                        type="button"
+                        class="btn btn-sm btn-outline-secondary edit-match-button"
+                        data-bs-toggle="modal"
+                        data-bs-target="#editMatchModal"
+                        data-match-id="${Number(match.id)}"
+                        data-winner-id="${Number(match.winner_id ?? 0)}"
+                        data-loser-id="${Number(match.loser_id ?? 0)}"
+                        data-winner-score="${Number(match.winner_score ?? 0)}"
+                        data-loser-score="${Number(match.loser_score ?? 0)}"
+                        data-game-type="${escapeHtml(match.game_type || '')}"
+                    >
+                        <span class="button-icon" aria-hidden="true">
+                            <svg viewBox="0 0 16 16" focusable="false">
+                                <path d="M12.146.854a.5.5 0 0 1 .708 0l2.292 2.292a.5.5 0 0 1 0 .708l-8.5 8.5L4 13l.646-2.646 8.5-8.5ZM3.5 13.5l2.793-.707L2.707 9.207 2 12a1 1 0 0 0 1.5 1.5Z" fill="currentColor"/>
+                            </svg>
+                        </span>
+                        <span>Edit</span>
+                    </button>
+                    ${renderDeleteMatchForm(match.id)}
+                </div>
+            </article>
         `).join('');
     };
 
@@ -475,7 +528,10 @@
         }
 
         loadMoreButton.disabled = true;
+        loadMoreButton.setAttribute('aria-busy', 'true');
         loadMoreButton.innerHTML = '<span class="spinner-border spinner-border-sm me-2" aria-hidden="true"></span>Loading';
+        setBusyState(matchHistoryBody, true);
+        announceStatus('Loading more matches.');
 
         try {
             const params = new URLSearchParams({
@@ -509,6 +565,7 @@
                 if (loadMoreStatus) {
                     loadMoreStatus.textContent = 'All matching history rows are already shown.';
                 }
+                announceStatus('All matching history rows are already shown.');
                 return;
             }
 
@@ -516,12 +573,22 @@
                 const shownCount = totalMatchHistory > 0 ? Math.min(matchOffset, totalMatchHistory) : matchOffset;
                 loadMoreStatus.textContent = `Showing ${shownCount} of ${totalMatchHistory || shownCount} matching rows.`;
             }
+            announceStatus(Array.isArray(data.matches) && data.matches.length > 0
+                ? `Loaded ${data.matches.length} more matches. Showing ${Math.min(matchOffset, totalMatchHistory || matchOffset)} rows.`
+                : 'No additional matches were returned.');
         } catch (error) {
-            alert('Could not load more matches right now.');
+            if (loadMoreStatus) {
+                loadMoreStatus.textContent = 'Could not load more matches right now. Try again.';
+            }
+
+            announceStatus('Could not load more matches right now. Try again.');
         } finally {
+            loadMoreButton.removeAttribute('aria-busy');
+            setBusyState(matchHistoryBody, false);
+
             if (loadMoreButton.innerHTML !== 'All matches loaded') {
                 loadMoreButton.disabled = false;
-                loadMoreButton.innerHTML = 'Load more';
+                loadMoreButton.innerHTML = defaultMatchLoadMoreButtonHtml;
             }
         }
     });
