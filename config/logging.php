@@ -76,7 +76,8 @@ return [
         // Keep participant and match activity in its own easy-to-read file.
         'league' => [
             'driver' => 'daily',
-            'path' => storage_path('logs/league.log'),
+            'name' => 'league',
+            'path' => storage_path('logs/' . (env('APP_ENV') === 'testing' ? 'league-testing.log' : 'league.log')),
             'level' => env('LOG_LEVEL', 'info'),
             'days' => env('LOG_DAILY_DAYS', 14),
             'replace_placeholders' => true,
