@@ -266,8 +266,15 @@ Vite is a frontend build tool. It prepares CSS and JavaScript files so the brows
 - `resources/js/app.js` now loads only the Bootstrap JavaScript parts the app really uses.
 - `resources/js/app.js` also loads the dashboard script only on the dashboard page.
 - The statistics page now lazy loads local Chart.js files through Vite instead of loading Chart.js from a CDN.
+- The statistics page now sends its chart data in a JSON script block and caches repeated stats queries for one minute.
 - Some lower dashboard sections are deferred so the top of the page can show faster.
 - Unused Tailwind CSS directives were removed from the main stylesheet to reduce the CSS payload.
+
+Important note for testing:
+
+- Run `npm run build` before you test Lighthouse.
+- If you want Lighthouse to include the cache headers and compression rules from `public/.htaccess`, test through XAMPP Apache instead of `php artisan serve`.
+- `php artisan serve` is still fine for normal development, but it will not apply those Apache delivery optimizations.
 
 The main point:
 
