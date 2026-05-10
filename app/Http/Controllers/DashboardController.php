@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Models\MatchGame;
 use App\Models\Participant;
+use App\Support\StatsPageCache;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\Request;
 
@@ -96,38 +97,40 @@ class DashboardController extends Controller
     // Prepare the numbers and lists used on the statistics page.
     public function stats()
     {
-        $participants = $this->standingsQuery()->get();
+        return view('stats', StatsPageCache::remember(function (): array {
+            $participants = $this->standingsQuery()->get();
 
-        $gameBreakdown = MatchGame::query()
-            ->selectRaw("COALESCE(NULLIF(game_type, ''), 'Unspecified') as label, COUNT(*) as total")
-            ->groupBy('label')
-            ->orderByDesc('total')
-            ->get();
+            $gameBreakdown = MatchGame::query()
+                ->selectRaw("COALESCE(NULLIF(game_type, ''), 'Unspecified') as label, COUNT(*) as total")
+                ->groupBy('label')
+                ->orderByDesc('total')
+                ->get();
 
-        $summary = [
-            'participants' => $participants->count(),
-            'matches' => MatchGame::count(),
-            'total_points' => (int) $participants->sum('points'),
-            'avg_winner_score' => round((float) MatchGame::avg('winner_score'), 1),
-        ];
+            $summary = [
+                'participants' => $participants->count(),
+                'matches' => MatchGame::count(),
+                'total_points' => (int) $participants->sum('points'),
+                'avg_winner_score' => round((float) MatchGame::avg('winner_score'), 1),
+            ];
 
-        $topPlayer = $participants->first();
+            $topPlayer = $participants->first();
 
-        $bestWinRate = $participants
-            ->filter(fn (Participant $participant): bool => $participant->matches_played > 0)
-            ->sortByDesc(fn (Participant $participant): float => $participant->wins / max($participant->matches_played, 1))
-            ->first();
+            $bestWinRate = $participants
+                ->filter(fn (Participant $participant): bool => $participant->matches_played > 0)
+                ->sortByDesc(fn (Participant $participant): float => $participant->wins / max($participant->matches_played, 1))
+                ->first();
 
-        $mostPlayedGame = $gameBreakdown->first();
+            $mostPlayedGame = $gameBreakdown->first();
 
-        return view('stats', compact(
-            'participants',
-            'gameBreakdown',
-            'summary',
-            'topPlayer',
-            'bestWinRate',
-            'mostPlayedGame'
-        ));
+            return compact(
+                'participants',
+                'gameBreakdown',
+                'summary',
+                'topPlayer',
+                'bestWinRate',
+                'mostPlayedGame'
+            );
+        }));
     }
 
     // The Load more button uses this to get the next history rows.
