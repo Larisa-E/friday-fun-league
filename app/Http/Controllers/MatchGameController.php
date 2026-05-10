@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Models\MatchGame;
 use App\Services\LeagueStatsService;
+use App\Support\StatsPageCache;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
@@ -32,6 +33,8 @@ class MatchGameController extends Controller
 
             $leagueStats->recalculateParticipantStats();
         });
+
+        StatsPageCache::forget();
 
         Log::channel('league')->info('Match created', [
             'match_id' => $match?->id,
@@ -77,6 +80,8 @@ class MatchGameController extends Controller
             $leagueStats->recalculateParticipantStats();
         });
 
+        StatsPageCache::forget();
+
         Log::channel('league')->info('Match updated', [
             'match_id' => $match->id,
             'before' => $before,
@@ -95,6 +100,8 @@ class MatchGameController extends Controller
             $match->delete();
             $leagueStats->recalculateParticipantStats();
         });
+
+        StatsPageCache::forget();
 
         Log::channel('league')->info('Match deleted', [
             'match_id' => $deletedMatch['id'],
