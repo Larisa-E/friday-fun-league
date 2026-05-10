@@ -1,13 +1,39 @@
-import Alert from 'bootstrap/js/dist/alert';
-import Modal from 'bootstrap/js/dist/modal';
-import Tab from 'bootstrap/js/dist/tab';
-import Toast from 'bootstrap/js/dist/toast';
+const bootstrapLoaders = {
+    Alert: () => import('bootstrap/js/dist/alert'),
+    Modal: () => import('bootstrap/js/dist/modal'),
+    Tab: () => import('bootstrap/js/dist/tab'),
+    Toast: () => import('bootstrap/js/dist/toast'),
+};
 
-window.bootstrap = { Alert, Modal, Tab, Toast };
+const bootstrapModules = {};
+
+const ensureBootstrap = async (moduleNames) => {
+    const missingModules = moduleNames.filter((moduleName) => !bootstrapModules[moduleName]);
+
+    if (missingModules.length) {
+        const loadedModules = await Promise.all(missingModules.map(async (moduleName) => {
+            const module = await bootstrapLoaders[moduleName]();
+
+            return [moduleName, module.default];
+        }));
+
+        loadedModules.forEach(([moduleName, moduleValue]) => {
+            bootstrapModules[moduleName] = moduleValue;
+        });
+    }
+
+    window.bootstrap = bootstrapModules;
+
+    return bootstrapModules;
+};
+
+if (document.querySelector('.alert-dismissible')) {
+    void ensureBootstrap(['Alert']);
+}
 
 // Only load the dashboard code on the dashboard page.
 if (document.getElementById('dashboard-state')) {
-    void import('./dashboard');
+    void ensureBootstrap(['Alert', 'Modal', 'Tab', 'Toast']).then(() => import('./dashboard'));
 }
 
 // Only load the statistics code on the statistics page.
