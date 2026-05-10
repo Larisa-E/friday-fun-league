@@ -1,5 +1,9 @@
 @extends('layouts.app')
 
+@push('styles')
+    @vite('resources/css/stats.css')
+@endpush
+
 @section('content')
 
 @php
