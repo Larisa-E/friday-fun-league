@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Models\Participant;
 use App\Services\LeagueStatsService;
+use App\Support\StatsPageCache;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
@@ -23,6 +24,8 @@ class ParticipantController extends Controller
             'name' => $request->name,
             'avatar_emoji' => $request->avatar_emoji,
         ]);
+
+        StatsPageCache::forget();
 
         Log::channel('league')->info('Participant created', [
             'participant_id' => $participant->id,
@@ -59,6 +62,8 @@ class ParticipantController extends Controller
 
         $participant->update($validated);
 
+        StatsPageCache::forget();
+
         Log::channel('league')->info('Participant updated', [
             'participant_id' => $participant->id,
             'before' => $before,
@@ -77,6 +82,8 @@ class ParticipantController extends Controller
             $participant->delete();
             $leagueStats->recalculateParticipantStats();
         });
+
+        StatsPageCache::forget();
 
         Log::channel('league')->info('Participant deleted', [
             'participant_id' => $deletedParticipant['id'],
