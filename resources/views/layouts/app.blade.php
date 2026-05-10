@@ -40,21 +40,6 @@
     @yield('content')
 </main>
 
-<div class="toast-container position-fixed top-0 end-0 p-3 app-toast-stack">
-    <div id="app-toast" class="toast app-toast border-0" role="status" aria-live="polite" aria-atomic="true">
-        <div class="d-flex align-items-center">
-            <div class="toast-body d-flex align-items-center gap-2">
-                <span class="status-icon" aria-hidden="true">
-                    <x-icon name="check" />
-                </span>
-                <span id="app-toast-message">Action completed.</span>
-            </div>
-            <button type="button" class="btn-close btn-close-white me-2 m-auto" data-bs-dismiss="toast" aria-label="Close"></button>
-        </div>
-    </div>
-</div>
-
-
 @stack('scripts')
 
 </body>
