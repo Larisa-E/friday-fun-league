@@ -1,5 +1,4 @@
 const bootstrapLoaders = {
-    Alert: () => import('bootstrap/js/dist/alert'),
     Modal: () => import('bootstrap/js/dist/modal'),
     Tab: () => import('bootstrap/js/dist/tab'),
     Toast: () => import('bootstrap/js/dist/toast'),
@@ -27,13 +26,29 @@ const ensureBootstrap = async (moduleNames) => {
     return bootstrapModules;
 };
 
-if (document.querySelector('.alert-dismissible')) {
-    void ensureBootstrap(['Alert']);
-}
+document.addEventListener('click', (event) => {
+    const dismissButton = event.target.closest('[data-app-dismiss="alert"]');
+
+    if (!dismissButton) {
+        return;
+    }
+
+    const alertElement = dismissButton.closest('.alert');
+
+    if (!alertElement) {
+        return;
+    }
+
+    alertElement.classList.remove('show');
+
+    window.setTimeout(() => {
+        alertElement.remove();
+    }, 150);
+});
 
 // Only load the dashboard code on the dashboard page.
 if (document.getElementById('dashboard-state')) {
-    void ensureBootstrap(['Alert', 'Modal', 'Tab', 'Toast']).then(() => import('./dashboard'));
+    void ensureBootstrap(['Modal', 'Tab', 'Toast']).then(() => import('./dashboard'));
 }
 
 // Only load the statistics code on the statistics page.
