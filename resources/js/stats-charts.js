@@ -9,7 +9,7 @@ export const initStatsCharts = (ChartCtor) => {
 
     statsNode.dataset.chartsInitialized = 'true';
 
-    const payload = JSON.parse(statsNode.dataset.payload ?? '{}');
+    const payload = JSON.parse(statsNode.textContent ?? '{}');
     const {
         participantLabels = [],
         participantPoints = [],

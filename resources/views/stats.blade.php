@@ -8,13 +8,13 @@
 
 @php
     // Save the PHP statistics as JSON so the chart script can use them later.
-    $statsPayload = json_encode([
+    $statsPayload = [
         'participantLabels' => $participants->pluck('name')->values(),
         'participantPoints' => $participants->pluck('points')->values(),
         'participantWins' => $participants->pluck('wins')->values(),
         'gameLabels' => $gameBreakdown->pluck('label')->values(),
         'gameTotals' => $gameBreakdown->pluck('total')->values(),
-    ]);
+    ];
 
     $standingsSnapshot = $participants->take(5);
     $leader = $participants->first();
@@ -224,11 +224,7 @@
         </div>
     </div>
 
-    <div
-        id="stats-data"
-        hidden
-        data-payload="{{ $statsPayload }}"
-    ></div>
+    <script id="stats-data" type="application/json">@json($statsPayload)</script>
 </div>
 
 @endsection
