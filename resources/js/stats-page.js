@@ -16,7 +16,7 @@ if (statsNode && chartAnchor) {
 
         try {
             const [{ default: Chart }] = await Promise.all([
-                import('chart.js/auto'),
+                import('./stats-chart-runtime'),
             ]);
 
             initStatsCharts(Chart);
@@ -25,16 +25,30 @@ if (statsNode && chartAnchor) {
         }
     };
 
+    const scheduleChartLoad = () => {
+        if ('requestIdleCallback' in window) {
+            window.requestIdleCallback(() => {
+                void loadCharts();
+            }, { timeout: 1200 });
+
+            return;
+        }
+
+        window.setTimeout(() => {
+            void loadCharts();
+        }, 0);
+    };
+
     if ('IntersectionObserver' in window) {
         const observer = new IntersectionObserver((entries) => {
             if (entries.some((entry) => entry.isIntersecting)) {
                 observer.disconnect();
-                void loadCharts();
+                scheduleChartLoad();
             }
         }, { rootMargin: '120px 0px' });
 
         observer.observe(chartAnchor);
     } else {
-        void loadCharts();
+        scheduleChartLoad();
     }
 }
