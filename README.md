@@ -270,6 +270,29 @@ Vite is a frontend build tool. It prepares CSS and JavaScript files so the brows
 - Some lower dashboard sections are deferred so the top of the page can show faster.
 - Unused Tailwind CSS directives were removed from the main stylesheet to reduce the CSS payload.
 
+### In easy words
+
+Here is what changed, explained simply:
+
+- I removed CSS that the page was not really using, so the browser has less styling to read at the start.
+- I moved statistics-only styling into its own file, so the dashboard does not load extra stats styling when it does not need it.
+- I stopped loading extra web font files and used a system font stack, so the text can appear faster.
+- I made Bootstrap JavaScript load in smaller pieces, so the page does not download dashboard-only code everywhere.
+- I made the charts load later, only when the statistics area is needed.
+- I moved the heavy manage section on the dashboard so it loads when the user opens that tab, instead of loading all of it immediately.
+- I added cache and compression rules for Apache/XAMPP, so files can be sent more efficiently in a production-like test.
+- I cached repeated statistics queries for a short time, so the stats page does not repeat the same work on every request.
+
+The simple idea is this:
+
+- less code at the start
+- less CSS at the start
+- less JavaScript at the start
+- less HTML at the start
+- less repeated server work
+
+That is what helped the Lighthouse result.
+
 Important note for testing:
 
 - Run `npm run build` before you test Lighthouse.
@@ -282,6 +305,33 @@ The main point:
 - Less code has to be loaded at the start.
 - The first visible part of the page can appear faster.
 - This can help Lighthouse give a better performance result.
+
+## Assignment and submission notes
+
+The current project still matches the main assignment direction:
+
+- Laravel backend with Blade views
+- MySQL database
+- Bootstrap 5 responsive GUI
+- async refresh and lazy loading
+- PHPUnit tests
+- GitHub repository
+- edit, delete, search, filter, and statistics features
+- logs for service desk style support
+- architecture and documentation support
+
+The remaining manual submission items are not code changes inside the repo:
+
+- GitHub link
+- live demo link
+- presentation slides
+
+For the presentation, you can use the sections already in this README about:
+
+- why Laravel, Blade, Bootstrap, MySQL, and Chart.js were chosen
+- simple comparison with alternatives
+- conclusion and future improvements
+- ITIL 4 practices used in the project
 
 ## Lighthouse results
 
