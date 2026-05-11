@@ -1,0 +1,27 @@
+erDiagram
+    PARTICIPANTS {
+        bigint id PK
+        string name UK
+        string avatar_emoji
+        int points
+        int wins
+        int losses
+        int matches_played
+        timestamp created_at
+        timestamp updated_at
+    }
+
+    MATCH_GAMES {
+        bigint id PK
+        bigint winner_id FK
+        bigint loser_id FK
+        int winner_score
+        int loser_score
+        string game_type
+        timestamp played_at
+        timestamp created_at
+        timestamp updated_at
+    }
+
+    PARTICIPANTS ||--o{ MATCH_GAMES : winner_id
+    PARTICIPANTS ||--o{ MATCH_GAMES : loser_id
