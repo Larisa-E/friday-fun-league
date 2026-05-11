@@ -6,12 +6,16 @@ use App\Models\MatchGame;
 use App\Services\LeagueStatsService;
 use App\Support\StatsPageCache;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Validator;
 
 class MatchGameController extends Controller
 {
+    private const DASHBOARD_SHELL_CACHE_KEY = 'dashboard.page.shell.v1';
+    private const DASHBOARD_RESPONSE_CACHE_KEY = 'dashboard.page.response.v1';
+
     // Create a new match result and then recalculate the standings.
     public function store(Request $request, LeagueStatsService $leagueStats)
     {
@@ -34,6 +38,8 @@ class MatchGameController extends Controller
             $leagueStats->recalculateParticipantStats();
         });
 
+        Cache::forget($this->dashboardShellCacheKey());
+        Cache::forget($this->dashboardResponseCacheKey());
         StatsPageCache::forget();
 
         Log::channel('league')->info('Match created', [
@@ -80,6 +86,8 @@ class MatchGameController extends Controller
             $leagueStats->recalculateParticipantStats();
         });
 
+        Cache::forget($this->dashboardShellCacheKey());
+        Cache::forget($this->dashboardResponseCacheKey());
         StatsPageCache::forget();
 
         Log::channel('league')->info('Match updated', [
@@ -88,7 +96,9 @@ class MatchGameController extends Controller
             'after' => $match->only(['winner_id', 'loser_id', 'winner_score', 'loser_score', 'game_type']),
         ]);
 
-        return redirect()->route('dashboard')->with('success', 'Match updated successfully!');
+        return redirect()->route('dashboard')
+            ->with('success', 'Match updated successfully!')
+            ->with('activeWorkspaceTab', 'manage');
     }
 
     // Delete one match result and recalculate the standings afterwards.
@@ -101,6 +111,8 @@ class MatchGameController extends Controller
             $leagueStats->recalculateParticipantStats();
         });
 
+        Cache::forget($this->dashboardShellCacheKey());
+        Cache::forget($this->dashboardResponseCacheKey());
         StatsPageCache::forget();
 
         Log::channel('league')->info('Match deleted', [
@@ -112,6 +124,18 @@ class MatchGameController extends Controller
             'game_type' => $deletedMatch['game_type'],
         ]);
 
-        return redirect()->route('dashboard')->with('success', 'Match deleted successfully!');
+        return redirect()->route('dashboard')
+            ->with('success', 'Match deleted successfully!')
+            ->with('activeWorkspaceTab', 'manage');
+    }
+
+    private function dashboardShellCacheKey(): string
+    {
+        return self::DASHBOARD_SHELL_CACHE_KEY . '.' . app()->environment();
+    }
+
+    private function dashboardResponseCacheKey(): string
+    {
+        return self::DASHBOARD_RESPONSE_CACHE_KEY . '.' . app()->environment();
     }
 }

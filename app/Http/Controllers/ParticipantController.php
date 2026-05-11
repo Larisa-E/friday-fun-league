@@ -6,12 +6,16 @@ use App\Models\Participant;
 use App\Services\LeagueStatsService;
 use App\Support\StatsPageCache;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Validator;
 
 class ParticipantController extends Controller
 {
+    private const DASHBOARD_SHELL_CACHE_KEY = 'dashboard.page.shell.v1';
+    private const DASHBOARD_RESPONSE_CACHE_KEY = 'dashboard.page.response.v1';
+
     // Create a new participant from the dashboard form.
     public function store(Request $request)
     {
@@ -25,6 +29,8 @@ class ParticipantController extends Controller
             'avatar_emoji' => $request->avatar_emoji,
         ]);
 
+        Cache::forget($this->dashboardShellCacheKey());
+        Cache::forget($this->dashboardResponseCacheKey());
         StatsPageCache::forget();
 
         Log::channel('league')->info('Participant created', [
@@ -62,6 +68,8 @@ class ParticipantController extends Controller
 
         $participant->update($validated);
 
+        Cache::forget($this->dashboardShellCacheKey());
+        Cache::forget($this->dashboardResponseCacheKey());
         StatsPageCache::forget();
 
         Log::channel('league')->info('Participant updated', [
@@ -70,7 +78,9 @@ class ParticipantController extends Controller
             'after' => $participant->only(['name', 'avatar_emoji']),
         ]);
 
-        return redirect()->route('dashboard')->with('success', 'Participant updated successfully!');
+        return redirect()->route('dashboard')
+            ->with('success', 'Participant updated successfully!')
+            ->with('activeWorkspaceTab', 'manage');
     }
 
     // Delete the participant and recalculate standings so the rank list stays correct.
@@ -83,6 +93,8 @@ class ParticipantController extends Controller
             $leagueStats->recalculateParticipantStats();
         });
 
+        Cache::forget($this->dashboardShellCacheKey());
+        Cache::forget($this->dashboardResponseCacheKey());
         StatsPageCache::forget();
 
         Log::channel('league')->info('Participant deleted', [
@@ -91,6 +103,18 @@ class ParticipantController extends Controller
             'avatar_emoji' => $deletedParticipant['avatar_emoji'],
         ]);
 
-        return redirect()->route('dashboard')->with('success', 'Participant deleted successfully!');
+        return redirect()->route('dashboard')
+            ->with('success', 'Participant deleted successfully!')
+            ->with('activeWorkspaceTab', 'manage');
+    }
+
+    private function dashboardShellCacheKey(): string
+    {
+        return self::DASHBOARD_SHELL_CACHE_KEY . '.' . app()->environment();
+    }
+
+    private function dashboardResponseCacheKey(): string
+    {
+        return self::DASHBOARD_RESPONSE_CACHE_KEY . '.' . app()->environment();
     }
 }

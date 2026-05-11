@@ -8,14 +8,20 @@
     const latestMatchesBody = document.getElementById('latest-matches-body');
     const dashboardState = document.getElementById('dashboard-state');
     const dashboardDataUrl = dashboardState?.dataset.dashboardUrl ?? '';
+    const hydrateDashboardOnLoad = dashboardState?.dataset.hydrateDashboard === 'true';
     const leaderboardUrl = leaderboardState?.dataset.leaderboardUrl ?? '';
     const modalToReopen = dashboardState?.dataset.openModal ?? '';
     const statusAnnouncer = document.getElementById('dashboard-announcer');
     const toastElement = document.getElementById('app-toast');
     const toastMessage = document.getElementById('app-toast-message');
+    const addWorkspacePane = document.getElementById('workspace-add');
+    const addWorkspaceUrl = addWorkspacePane?.dataset.addWorkspaceUrl ?? '';
+    const manageWorkspacePane = document.getElementById('workspace-manage');
+    const manageWorkspaceUrl = manageWorkspacePane?.dataset.manageWorkspaceUrl ?? '';
     const dashboardScrollKey = 'dashboard-scroll-position';
     let leaderboardOffset = Number(leaderboardState?.dataset.offset ?? 0);
     let leaderboardTotal = Number(leaderboardState?.dataset.total ?? 0);
+    let pendingModalReopened = false;
     // Old popup names may still come back after an error, so change them to the two shared popup names.
     const resolvedModalToReopen = modalToReopen.startsWith('editParticipantModal')
         ? 'editParticipantModal'
@@ -24,6 +30,15 @@
             : modalToReopen;
     const defaultRefreshButtonHtml = refreshButton?.innerHTML ?? 'Refresh';
     const defaultLeaderboardLoadMoreButtonHtml = leaderboardLoadMoreButton?.innerHTML ?? 'Load more';
+    let addWorkspaceVisibilityObserver = null;
+
+    const ensureBootstrapModules = async (moduleNames) => {
+        if (typeof window.ensureBootstrapModules !== 'function') {
+            return {};
+        }
+
+        return window.ensureBootstrapModules(moduleNames);
+    };
 
     const showToast = (message) => {
         if (!toastElement || !toastMessage || !window.bootstrap?.Toast) {
@@ -58,6 +73,15 @@
         }
 
         element.removeAttribute('aria-busy');
+    };
+
+    const deferUntilIdle = (callback, timeout = 800) => {
+        if (typeof window.requestIdleCallback === 'function') {
+            window.requestIdleCallback(callback, { timeout });
+            return;
+        }
+
+        window.setTimeout(callback, 250);
     };
 
     // Save where the user is on the page before a normal form submit.
@@ -218,6 +242,42 @@
         `).join('');
     };
 
+    const applyDashboardPayload = (data) => {
+        const refreshedParticipants = Array.isArray(data.participants) ? data.participants : [];
+
+        renderLeaderboard(refreshedParticipants);
+        renderLatestMatches(Array.isArray(data.matches) ? data.matches : []);
+
+        leaderboardOffset = refreshedParticipants.length;
+        leaderboardTotal = Number(data.participantTotal ?? refreshedParticipants.length);
+
+        if (leaderboardState) {
+            leaderboardState.dataset.offset = String(leaderboardOffset);
+            leaderboardState.dataset.total = String(leaderboardTotal);
+        }
+
+        updateLeaderboardLoadState();
+    };
+
+    const fetchDashboardPayload = async (participantLimit) => {
+        const params = new URLSearchParams({
+            participant_limit: String(participantLimit),
+        });
+
+        const response = await fetch(`${dashboardDataUrl}?${params.toString()}`, {
+            headers: {
+                Accept: 'application/json',
+                'X-Requested-With': 'XMLHttpRequest',
+            },
+        });
+
+        if (!response.ok) {
+            throw new Error(`Refresh failed with status ${response.status}`);
+        }
+
+        return response.json();
+    };
+
     // Ask the server for the next players and add them to the rank list.
     leaderboardLoadMoreButton?.addEventListener('click', async () => {
         if (!leaderboardUrl || leaderboardLoadMoreButton.disabled) {
@@ -313,37 +373,9 @@
         }
 
         try {
-            const params = new URLSearchParams({
-                participant_limit: String(leaderboardOffset),
-            });
+            const data = await fetchDashboardPayload(leaderboardOffset || 10);
 
-            const response = await fetch(`${dashboardDataUrl}?${params.toString()}`, {
-                headers: {
-                    Accept: 'application/json',
-                    'X-Requested-With': 'XMLHttpRequest',
-                },
-            });
-
-            if (!response.ok) {
-                throw new Error(`Refresh failed with status ${response.status}`);
-            }
-
-            const data = await response.json();
-
-            const refreshedParticipants = Array.isArray(data.participants) ? data.participants : [];
-
-            renderLeaderboard(refreshedParticipants);
-            renderLatestMatches(Array.isArray(data.matches) ? data.matches : []);
-
-            leaderboardOffset = refreshedParticipants.length;
-            leaderboardTotal = Number(data.participantTotal ?? refreshedParticipants.length);
-
-            if (leaderboardState) {
-                leaderboardState.dataset.offset = String(leaderboardOffset);
-                leaderboardState.dataset.total = String(leaderboardTotal);
-            }
-
-            updateLeaderboardLoadState();
+            applyDashboardPayload(data);
             showToast('Dashboard updated successfully.');
             announceStatus('Dashboard updated successfully.');
         } catch (error) {
@@ -357,47 +389,96 @@
         }
     });
 
-    // Open the correct shared popup again after an error so the user can see the message right away.
-    if (resolvedModalToReopen && window.bootstrap) {
-        const modalElement = document.getElementById(resolvedModalToReopen);
+    const hydrateDashboard = async () => {
+        setBusyState(leaderboardBody, true);
+        setBusyState(latestMatchesBody, true);
 
-        if (modalElement) {
-            const firstInvalidField = modalElement.querySelector('.is-invalid');
+        try {
+            const data = await fetchDashboardPayload(10);
 
-            if (firstInvalidField) {
-                modalElement.addEventListener('shown.bs.modal', () => {
-                    firstInvalidField.focus();
-                }, { once: true });
-            }
+            applyDashboardPayload(data);
+            announceStatus('Dashboard loaded successfully.');
+        } catch (error) {
+            announceStatus('Could not load the latest dashboard data. Reloading the page.');
+            window.location.reload();
+        } finally {
+            setBusyState(leaderboardBody, false);
+            setBusyState(latestMatchesBody, false);
+        }
+    };
 
-            window.bootstrap.Modal.getOrCreateInstance(modalElement).show();
+    if (hydrateDashboardOnLoad && dashboardDataUrl) {
+        const queueDashboardHydration = () => {
+            deferUntilIdle(() => {
+                void hydrateDashboard();
+            });
+        };
+
+        if (document.readyState === 'complete') {
+            queueDashboardHydration();
+        } else {
+            window.addEventListener('load', queueDashboardHydration, { once: true });
         }
     }
 
-    // Load the next history rows in the background and add them to the current table.
-    const loadMoreButton = document.getElementById('load-more-matches');
-    const loadMoreStatus = document.getElementById('load-more-status');
-    const matchHistoryBody = document.getElementById('match-history-body');
-    const matchHistoryState = document.getElementById('match-history-state');
-    const editParticipantForm = document.getElementById('edit-participant-form');
-    const editParticipantNameInput = document.getElementById('edit_participant_name');
-    const editParticipantAvatarInput = document.getElementById('edit_participant_avatar');
-    const editMatchForm = document.getElementById('edit-match-form');
-    const editMatchWinnerSelect = document.getElementById('edit_match_winner');
-    const editMatchLoserSelect = document.getElementById('edit_match_loser');
-    const editWinnerScoreInput = document.getElementById('edit_winner_score');
-    const editLoserScoreInput = document.getElementById('edit_loser_score');
-    const editGameTypeInput = document.getElementById('edit_game_type');
-    const historyUrl = matchHistoryState?.dataset.historyUrl ?? '';
-    const matchesBaseUrl = matchHistoryState?.dataset.matchesBaseUrl ?? '';
-    const participantsBaseUrl = matchHistoryState?.dataset.participantsBaseUrl ?? '';
-    const csrfToken = matchHistoryState?.dataset.csrfToken ?? '';
-    const totalMatchHistory = Number(matchHistoryState?.dataset.total ?? 0);
-    let matchOffset = Number(matchHistoryState?.dataset.offset ?? 0);
-    const defaultMatchLoadMoreButtonHtml = loadMoreButton?.innerHTML ?? 'Load more';
+    const openDashboardModal = async (modalId) => {
+        await ensureBootstrapModules(['Modal']);
+
+        const modalElement = document.getElementById(modalId);
+
+        if (!modalElement || !window.bootstrap?.Modal) {
+            return;
+        }
+
+        window.bootstrap.Modal.getOrCreateInstance(modalElement).show();
+    };
+
+    const moveManageWorkspaceModalsToBody = () => {
+        ['editParticipantModal', 'editMatchModal'].forEach((modalId) => {
+            const modalElement = document.getElementById(modalId);
+
+            if (!modalElement || modalElement.parentElement === document.body) {
+                return;
+            }
+
+            document.body.appendChild(modalElement);
+        });
+    };
+
+    const reopenPendingDashboardModal = async () => {
+        if (pendingModalReopened || !resolvedModalToReopen) {
+            return;
+        }
+
+        await ensureBootstrapModules(['Modal']);
+
+        const modalElement = document.getElementById(resolvedModalToReopen);
+
+        if (!modalElement || !window.bootstrap?.Modal) {
+            return;
+        }
+
+        pendingModalReopened = true;
+
+        const firstInvalidField = modalElement.querySelector('.is-invalid');
+
+        if (firstInvalidField) {
+            modalElement.addEventListener('shown.bs.modal', () => {
+                firstInvalidField.focus();
+            }, { once: true });
+        }
+
+        window.bootstrap.Modal.getOrCreateInstance(modalElement).show();
+    };
 
     // Put the clicked participant data into the shared participant popup.
     const populateParticipantEditModal = (button) => {
+        const editParticipantForm = document.getElementById('edit-participant-form');
+        const editParticipantNameInput = document.getElementById('edit_participant_name');
+        const editParticipantAvatarInput = document.getElementById('edit_participant_avatar');
+        const matchHistoryState = document.getElementById('match-history-state');
+        const participantsBaseUrl = matchHistoryState?.dataset.participantsBaseUrl ?? '';
+
         if (!editParticipantForm || !participantsBaseUrl) {
             return;
         }
@@ -416,6 +497,15 @@
 
     // Put the clicked match data into the shared match popup.
     const populateMatchEditModal = (button) => {
+        const editMatchForm = document.getElementById('edit-match-form');
+        const editMatchWinnerSelect = document.getElementById('edit_match_winner');
+        const editMatchLoserSelect = document.getElementById('edit_match_loser');
+        const editWinnerScoreInput = document.getElementById('edit_winner_score');
+        const editLoserScoreInput = document.getElementById('edit_loser_score');
+        const editGameTypeInput = document.getElementById('edit_game_type');
+        const matchHistoryState = document.getElementById('match-history-state');
+        const matchesBaseUrl = matchHistoryState?.dataset.matchesBaseUrl ?? '';
+
         if (!editMatchForm || !matchesBaseUrl) {
             return;
         }
@@ -450,6 +540,11 @@
 
         if (participantButton) {
             populateParticipantEditModal(participantButton);
+
+            if (!window.bootstrap?.Modal) {
+                void openDashboardModal('editParticipantModal');
+            }
+
             return;
         }
 
@@ -457,6 +552,10 @@
 
         if (matchButton) {
             populateMatchEditModal(matchButton);
+
+            if (!window.bootstrap?.Modal) {
+                void openDashboardModal('editMatchModal');
+            }
         }
     });
 
@@ -521,74 +620,236 @@
         `).join('');
     };
 
-    // Ask the server for the next rows and add them without reloading the page.
-    loadMoreButton?.addEventListener('click', async () => {
-        if (!historyUrl || loadMoreButton.disabled) {
+    const initManageWorkspace = async () => {
+        const loadMoreButton = document.getElementById('load-more-matches');
+        const loadMoreStatus = document.getElementById('load-more-status');
+        const matchHistoryBody = document.getElementById('match-history-body');
+        const matchHistoryState = document.getElementById('match-history-state');
+
+        if (!matchHistoryState) {
             return;
         }
 
-        loadMoreButton.disabled = true;
-        loadMoreButton.setAttribute('aria-busy', 'true');
-        loadMoreButton.innerHTML = '<span class="spinner-border spinner-border-sm me-2" aria-hidden="true"></span>Loading';
-        setBusyState(matchHistoryBody, true);
-        announceStatus('Loading more matches.');
+        await reopenPendingDashboardModal();
+        await ensureBootstrapModules(['Modal']);
+
+        if (!loadMoreButton || loadMoreButton.dataset.bound === 'true') {
+            return;
+        }
+
+        loadMoreButton.dataset.bound = 'true';
+
+        const historyUrl = matchHistoryState.dataset.historyUrl ?? '';
+        const totalMatchHistory = Number(matchHistoryState.dataset.total ?? 0);
+        let matchOffset = Number(matchHistoryState.dataset.offset ?? 0);
+        const defaultMatchLoadMoreButtonHtml = loadMoreButton.innerHTML || 'Load more';
+
+        loadMoreButton.addEventListener('click', async () => {
+            if (!historyUrl || loadMoreButton.disabled) {
+                return;
+            }
+
+            loadMoreButton.disabled = true;
+            loadMoreButton.setAttribute('aria-busy', 'true');
+            loadMoreButton.innerHTML = '<span class="spinner-border spinner-border-sm me-2" aria-hidden="true"></span>Loading';
+            setBusyState(matchHistoryBody, true);
+            announceStatus('Loading more matches.');
+
+            try {
+                const params = new URLSearchParams({
+                    offset: String(matchOffset),
+                    match_search: matchHistoryState.dataset.matchSearch ?? '',
+                    game_type: matchHistoryState.dataset.gameType ?? '',
+                });
+
+                const response = await fetch(`${historyUrl}?${params.toString()}`, {
+                    headers: {
+                        Accept: 'application/json',
+                        'X-Requested-With': 'XMLHttpRequest',
+                    },
+                });
+
+                if (!response.ok) {
+                    throw new Error(`History load failed: ${response.status}`);
+                }
+
+                const data = await response.json();
+
+                if (Array.isArray(data.matches) && data.matches.length > 0) {
+                    matchHistoryBody.insertAdjacentHTML('beforeend', renderMatchHistoryRows(data.matches));
+                }
+
+                matchOffset = Number(data.nextOffset ?? matchOffset);
+                matchHistoryState.dataset.offset = String(matchOffset);
+
+                if (!data.hasMore) {
+                    loadMoreButton.disabled = true;
+                    loadMoreButton.innerHTML = 'All matches loaded';
+                    if (loadMoreStatus) {
+                        loadMoreStatus.textContent = 'All matching history rows are already shown.';
+                    }
+                    announceStatus('All matching history rows are already shown.');
+                    return;
+                }
+
+                if (loadMoreStatus) {
+                    const shownCount = totalMatchHistory > 0 ? Math.min(matchOffset, totalMatchHistory) : matchOffset;
+                    loadMoreStatus.textContent = `Showing ${shownCount} of ${totalMatchHistory || shownCount} matching rows.`;
+                }
+                announceStatus(Array.isArray(data.matches) && data.matches.length > 0
+                    ? `Loaded ${data.matches.length} more matches. Showing ${Math.min(matchOffset, totalMatchHistory || matchOffset)} rows.`
+                    : 'No additional matches were returned.');
+            } catch (error) {
+                if (loadMoreStatus) {
+                    loadMoreStatus.textContent = 'Could not load more matches right now. Try again.';
+                }
+
+                announceStatus('Could not load more matches right now. Try again.');
+            } finally {
+                loadMoreButton.removeAttribute('aria-busy');
+                setBusyState(matchHistoryBody, false);
+
+                if (loadMoreButton.innerHTML !== 'All matches loaded') {
+                    loadMoreButton.disabled = false;
+                    loadMoreButton.innerHTML = defaultMatchLoadMoreButtonHtml;
+                }
+            }
+        });
+    };
+
+    const loadAddWorkspace = async () => {
+        if (!addWorkspacePane
+            || addWorkspacePane.dataset.addWorkspaceLoaded === 'true'
+            || addWorkspacePane.dataset.addWorkspaceLoading === 'true'
+            || !addWorkspaceUrl) {
+            return;
+        }
+
+        addWorkspacePane.dataset.addWorkspaceLoading = 'true';
+        addWorkspacePane.innerHTML = `
+            <div class="workspace-lazy-state workspace-lazy-state-loading">
+                <div class="workspace-lazy-card">
+                    <h3 class="workspace-lazy-title">Loading add tools…</h3>
+                    <p class="workspace-lazy-copy mb-0">Fetching the participant and match forms.</p>
+                </div>
+            </div>
+        `;
 
         try {
-            const params = new URLSearchParams({
-                offset: String(matchOffset),
-                match_search: matchHistoryState?.dataset.matchSearch ?? '',
-                game_type: matchHistoryState?.dataset.gameType ?? '',
-            });
-
-            const response = await fetch(`${historyUrl}?${params.toString()}`, {
+            const response = await fetch(addWorkspaceUrl, {
                 headers: {
-                    Accept: 'application/json',
+                    Accept: 'text/html',
                     'X-Requested-With': 'XMLHttpRequest',
                 },
             });
 
             if (!response.ok) {
-                throw new Error(`History load failed: ${response.status}`);
+                throw new Error(`Add workspace load failed: ${response.status}`);
             }
 
-            const data = await response.json();
-
-            if (Array.isArray(data.matches) && data.matches.length > 0) {
-                matchHistoryBody.insertAdjacentHTML('beforeend', renderMatchHistoryRows(data.matches));
-            }
-
-            matchOffset = Number(data.nextOffset ?? matchOffset);
-
-            if (!data.hasMore) {
-                loadMoreButton.disabled = true;
-                loadMoreButton.innerHTML = 'All matches loaded';
-                if (loadMoreStatus) {
-                    loadMoreStatus.textContent = 'All matching history rows are already shown.';
-                }
-                announceStatus('All matching history rows are already shown.');
-                return;
-            }
-
-            if (loadMoreStatus) {
-                const shownCount = totalMatchHistory > 0 ? Math.min(matchOffset, totalMatchHistory) : matchOffset;
-                loadMoreStatus.textContent = `Showing ${shownCount} of ${totalMatchHistory || shownCount} matching rows.`;
-            }
-            announceStatus(Array.isArray(data.matches) && data.matches.length > 0
-                ? `Loaded ${data.matches.length} more matches. Showing ${Math.min(matchOffset, totalMatchHistory || matchOffset)} rows.`
-                : 'No additional matches were returned.');
+            addWorkspacePane.innerHTML = await response.text();
+            addWorkspacePane.dataset.addWorkspaceLoaded = 'true';
         } catch (error) {
-            if (loadMoreStatus) {
-                loadMoreStatus.textContent = 'Could not load more matches right now. Try again.';
-            }
-
-            announceStatus('Could not load more matches right now. Try again.');
+            addWorkspacePane.innerHTML = `
+                <div class="workspace-lazy-state workspace-lazy-state-error">
+                    <div class="workspace-lazy-card">
+                        <h3 class="workspace-lazy-title">Could not load the add tools.</h3>
+                        <p class="workspace-lazy-copy mb-0">Reload the page and try again.</p>
+                    </div>
+                </div>
+            `;
         } finally {
-            loadMoreButton.removeAttribute('aria-busy');
-            setBusyState(matchHistoryBody, false);
-
-            if (loadMoreButton.innerHTML !== 'All matches loaded') {
-                loadMoreButton.disabled = false;
-                loadMoreButton.innerHTML = defaultMatchLoadMoreButtonHtml;
-            }
+            addWorkspacePane.removeAttribute('data-add-workspace-loading');
         }
+    };
+
+    const loadManageWorkspace = async () => {
+        if (!manageWorkspacePane
+            || manageWorkspacePane.dataset.manageWorkspaceLoaded === 'true'
+            || manageWorkspacePane.dataset.manageWorkspaceLoading === 'true'
+            || !manageWorkspaceUrl) {
+            return;
+        }
+
+        manageWorkspacePane.dataset.manageWorkspaceLoading = 'true';
+        manageWorkspacePane.innerHTML = `
+            <div class="workspace-lazy-state workspace-lazy-state-loading">
+                <div class="workspace-lazy-card">
+                    <h3 class="workspace-lazy-title">Loading manage tools…</h3>
+                    <p class="workspace-lazy-copy mb-0">Fetching participants, history, and edit actions.</p>
+                </div>
+            </div>
+        `;
+
+        try {
+            const response = await fetch(manageWorkspaceUrl, {
+                headers: {
+                    Accept: 'text/html',
+                    'X-Requested-With': 'XMLHttpRequest',
+                },
+            });
+
+            if (!response.ok) {
+                throw new Error(`Workspace load failed: ${response.status}`);
+            }
+
+            manageWorkspacePane.innerHTML = await response.text();
+            manageWorkspacePane.dataset.manageWorkspaceLoaded = 'true';
+            moveManageWorkspaceModalsToBody();
+            await initManageWorkspace();
+        } catch (error) {
+            manageWorkspacePane.innerHTML = `
+                <div class="workspace-lazy-state workspace-lazy-state-error">
+                    <div class="workspace-lazy-card">
+                        <h3 class="workspace-lazy-title">Could not load the manage tools.</h3>
+                        <p class="workspace-lazy-copy mb-0">Reload the page and try again.</p>
+                    </div>
+                </div>
+            `;
+        } finally {
+            manageWorkspacePane.removeAttribute('data-manage-workspace-loading');
+        }
+    };
+
+    document.getElementById('workspace-manage-tab')?.addEventListener('shown.bs.tab', () => {
+        void loadManageWorkspace();
     });
+
+    document.getElementById('workspace-add-tab')?.addEventListener('shown.bs.tab', () => {
+        if (addWorkspaceVisibilityObserver) {
+            addWorkspaceVisibilityObserver.disconnect();
+            addWorkspaceVisibilityObserver = null;
+        }
+
+        void loadAddWorkspace();
+    });
+
+    if (addWorkspacePane?.dataset.addWorkspaceLoaded !== 'true'
+        && addWorkspacePane?.classList.contains('show')) {
+        const workspaceSection = addWorkspacePane.closest('.dashboard-workspace') ?? addWorkspacePane;
+
+        if (typeof window.IntersectionObserver === 'function') {
+            addWorkspaceVisibilityObserver = new window.IntersectionObserver((entries, observer) => {
+                if (!entries.some((entry) => entry.isIntersecting)) {
+                    return;
+                }
+
+                observer.disconnect();
+                addWorkspaceVisibilityObserver = null;
+                void loadAddWorkspace();
+            }, {
+                rootMargin: '240px 0px',
+            });
+
+            addWorkspaceVisibilityObserver.observe(workspaceSection);
+        } else {
+            deferUntilIdle(() => {
+                void loadAddWorkspace();
+            }, 1500);
+        }
+    }
+
+    if (manageWorkspacePane?.dataset.manageWorkspaceLoaded === 'true') {
+        moveManageWorkspaceModalsToBody();
+        void initManageWorkspace();
+    }

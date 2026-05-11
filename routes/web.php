@@ -25,3 +25,5 @@ Route::get('/dashboard-data', [DashboardController::class, 'data'])->name('dashb
 Route::get('/dashboard-leaderboard', [DashboardController::class, 'leaderboard'])->name('dashboard.leaderboard');
 // Returns the next history rows for the Load more button.
 Route::get('/dashboard-history', [DashboardController::class, 'history'])->name('dashboard.history');
+Route::get('/dashboard-workspace/add', [DashboardController::class, 'addWorkspace'])->name('dashboard.workspace.add');
+Route::get('/dashboard-workspace/manage', [DashboardController::class, 'manageWorkspace'])->name('dashboard.workspace.manage');

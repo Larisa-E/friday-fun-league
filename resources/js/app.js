@@ -26,6 +26,8 @@ const ensureBootstrap = async (moduleNames) => {
     return bootstrapModules;
 };
 
+window.ensureBootstrapModules = ensureBootstrap;
+
 document.addEventListener('click', (event) => {
     const dismissButton = event.target.closest('[data-app-dismiss="alert"]');
 
@@ -48,7 +50,7 @@ document.addEventListener('click', (event) => {
 
 // Only load the dashboard code on the dashboard page.
 if (document.getElementById('dashboard-state')) {
-    void ensureBootstrap(['Modal', 'Tab', 'Toast']).then(() => import('./dashboard'));
+    void ensureBootstrap(['Tab', 'Toast']).then(() => import('./dashboard'));
 }
 
 // Only load the statistics code on the statistics page.

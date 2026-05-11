@@ -11,11 +11,16 @@ class StatsPageCache
 
     public static function remember(Closure $resolver): array
     {
-        return Cache::remember(self::KEY, now()->addMinute(), $resolver);
+        return Cache::remember(self::key(), now()->addMinute(), $resolver);
     }
 
     public static function forget(): void
     {
-        Cache::forget(self::KEY);
+        Cache::forget(self::key());
+    }
+
+    private static function key(): string
+    {
+        return self::KEY . '.' . app()->environment();
     }
 }

@@ -7,68 +7,119 @@ use App\Models\Participant;
 use App\Support\StatsPageCache;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\Request;
+use Illuminate\Support\Collection;
+use Illuminate\Support\Facades\Cache;
+use Illuminate\Support\ViewErrorBag;
 
 class DashboardController extends Controller
 {
     private const LEADERBOARD_LIMIT = 10;
+    private const SHELL_CACHE_KEY = 'dashboard.page.shell.v1';
+    private const RESPONSE_CACHE_KEY = 'dashboard.page.response.v1';
 
     // Load the dashboard and show only the first history rows at the start.
     public function index(Request $request)
     {
-        $participants = $this->standingsQuery()->get();
-        $leaderboardParticipants = $participants->take(self::LEADERBOARD_LIMIT)->values();
-        $totalLeaderboardParticipants = $participants->count();
-
         $matchSearch = trim((string) $request->input('match_search', ''));
         $gameType = trim((string) $request->input('game_type', ''));
-
-        $latestMatches = MatchGame::query()
-            ->with(['winner', 'loser'])
-            ->orderByDesc('played_at')
-            ->limit(10)
-            ->get();
-
-        $matchHistoryQuery = $this->matchHistoryQuery($matchSearch, $gameType);
-
-        $matchHistory = $matchHistoryQuery
-            ->limit(10)
-            ->get();
-
-        // If the page comes back with an error, also load that match so its Edit popup can open again.
-        $matchModalTargets = collect($matchHistory->all());
         $openModal = (string) $request->session()->get('openModal', '');
+        $hasCreateErrors = $this->hasCreateWorkspaceErrors($request);
+        $activeWorkspaceTab = $this->resolveActiveWorkspaceTab($request, $openModal, $matchSearch, $gameType);
+        $lazyLoadDashboardCollections = $this->shouldServeCachedDashboardResponse($request, $activeWorkspaceTab, $hasCreateErrors, $matchSearch, $gameType, $openModal);
 
-        if (preg_match('/^editMatchModal(\d+)$/', $openModal, $matches)) {
-            $modalMatch = MatchGame::query()
-                ->with(['winner', 'loser'])
-                ->find((int) $matches[1]);
+        if ($lazyLoadDashboardCollections) {
+            $html = Cache::remember(
+                $this->dashboardResponseCacheKey(),
+                now()->addMinutes(10),
+                fn (): string => $this->buildDashboardView(
+                    $request,
+                    $lazyLoadDashboardCollections,
+                    $activeWorkspaceTab,
+                    $hasCreateErrors,
+                    $matchSearch,
+                    $gameType,
+                    $openModal,
+                )->render(),
+            );
 
-            if ($modalMatch && ! $matchModalTargets->contains('id', $modalMatch->id)) {
-                $matchModalTargets->push($modalMatch);
-            }
+            return response($html);
         }
 
-        $totalMatchHistory = $this->matchHistoryQuery($matchSearch, $gameType)->count();
+        return $this->buildDashboardView(
+            $request,
+            $lazyLoadDashboardCollections,
+            $activeWorkspaceTab,
+            $hasCreateErrors,
+            $matchSearch,
+            $gameType,
+            $openModal,
+        );
+    }
 
-        $gameTypes = MatchGame::query()
-            ->whereNotNull('game_type')
-            ->where('game_type', '!=', '')
-            ->select('game_type')
-            ->distinct()
-            ->orderBy('game_type')
-            ->pluck('game_type');
+    private function buildDashboardView(
+        Request $request,
+        bool $lazyLoadDashboardCollections,
+        string $activeWorkspaceTab,
+        bool $hasCreateErrors,
+        string $matchSearch,
+        string $gameType,
+        string $openModal,
+    ) {
 
-        return view('dashboard', compact(
-            'participants',
-            'leaderboardParticipants',
-            'totalLeaderboardParticipants',
-            'latestMatches',
-            'matchHistory',
-            'matchModalTargets',
-            'totalMatchHistory',
-            'gameTypes',
-            'matchSearch',
-            'gameType'
+        $shellData = Cache::remember($this->dashboardShellCacheKey(), now()->addMinutes(10), function (): array {
+            $leaderboardParticipants = $this->standingsQuery()
+                ->limit(self::LEADERBOARD_LIMIT)
+                ->get();
+
+            return [
+                'leaderboardParticipants' => $leaderboardParticipants,
+                'totalLeaderboardParticipants' => Participant::count(),
+                'latestMatches' => MatchGame::query()
+                    ->with(['winner', 'loser'])
+                    ->orderByDesc('played_at')
+                    ->limit(10)
+                    ->get(),
+                'summaryMatchCount' => MatchGame::count(),
+                'trackedGameTypes' => $this->trackedGameTypesCount(),
+            ];
+        });
+
+        $loadAddWorkspaceInline = $activeWorkspaceTab === 'add' && $hasCreateErrors;
+        $workspaceParticipants = ($loadAddWorkspaceInline || $activeWorkspaceTab === 'manage')
+            ? $this->standingsQuery()->get()
+            : collect();
+
+        $manageWorkspaceData = $activeWorkspaceTab === 'manage'
+            ? $this->manageWorkspaceViewData($request, $workspaceParticipants, $matchSearch, $gameType, $openModal)
+            : [];
+
+        return view('dashboard', array_merge(
+            $shellData,
+            compact('activeWorkspaceTab', 'loadAddWorkspaceInline', 'workspaceParticipants', 'lazyLoadDashboardCollections'),
+            $manageWorkspaceData,
+        ));
+    }
+
+    public function addWorkspace()
+    {
+        return view('dashboard.partials.add-workspace', [
+            'participants' => $this->standingsQuery()->get(),
+        ]);
+    }
+
+    public function manageWorkspace(Request $request)
+    {
+        $participants = $this->standingsQuery()->get();
+        $matchSearch = trim((string) $request->input('match_search', ''));
+        $gameType = trim((string) $request->input('game_type', ''));
+        $openModal = (string) $request->session()->get('openModal', '');
+
+        return view('dashboard.partials.manage-workspace', $this->manageWorkspaceViewData(
+            $request,
+            $participants,
+            $matchSearch,
+            $gameType,
+            $openModal
         ));
     }
 
@@ -215,5 +266,136 @@ class DashboardController extends Controller
             ->orderByDesc('points')
             ->orderByRaw('CASE WHEN matches_played > 0 THEN wins * 1.0 / matches_played ELSE 0 END DESC')
             ->orderBy('name');
+    }
+
+    private function manageWorkspaceViewData(Request $request, Collection $participants, string $matchSearch, string $gameType, string $openModal): array
+    {
+        $matchHistory = $this->matchHistoryQuery($matchSearch, $gameType)
+            ->limit(10)
+            ->get();
+
+        $matchModalTargets = collect($matchHistory->all());
+
+        if (preg_match('/^editMatchModal(\d+)$/', $openModal, $matches)) {
+            $modalMatch = MatchGame::query()
+                ->with(['winner', 'loser'])
+                ->find((int) $matches[1]);
+
+            if ($modalMatch && ! $matchModalTargets->contains('id', $modalMatch->id)) {
+                $matchModalTargets->push($modalMatch);
+            }
+        }
+
+        $totalMatchHistory = $this->matchHistoryQuery($matchSearch, $gameType)->count();
+
+        $gameTypes = MatchGame::query()
+            ->whereNotNull('game_type')
+            ->where('game_type', '!=', '')
+            ->select('game_type')
+            ->distinct()
+            ->orderBy('game_type')
+            ->pluck('game_type');
+
+        $openParticipantId = preg_match('/^editParticipantModal(\d+)$/', $openModal, $participantModalMatches)
+            ? (int) $participantModalMatches[1]
+            : null;
+        $openMatchId = preg_match('/^editMatchModal(\d+)$/', $openModal, $matchModalMatches)
+            ? (int) $matchModalMatches[1]
+            : null;
+        $activeParticipant = $openParticipantId ? $participants->firstWhere('id', $openParticipantId) : null;
+        $sessionErrors = $request->session()->get('errors');
+        $activeParticipantErrorBag = $activeParticipant && $sessionErrors instanceof ViewErrorBag
+            ? $sessionErrors->getBag('participantUpdate.' . $activeParticipant->id)
+            : null;
+        $activeMatch = $openMatchId ? $matchModalTargets->firstWhere('id', $openMatchId) : null;
+        $activeMatchErrorBag = $activeMatch && $sessionErrors instanceof ViewErrorBag
+            ? $sessionErrors->getBag('matchUpdate.' . $activeMatch->id)
+            : null;
+
+        return compact(
+            'participants',
+            'matchHistory',
+            'matchModalTargets',
+            'totalMatchHistory',
+            'gameTypes',
+            'matchSearch',
+            'gameType',
+            'activeParticipant',
+            'activeParticipantErrorBag',
+            'activeMatch',
+            'activeMatchErrorBag'
+        );
+    }
+
+    private function resolveActiveWorkspaceTab(Request $request, string $openModal, string $matchSearch, string $gameType): string
+    {
+        $hasCreateErrors = $this->hasCreateWorkspaceErrors($request);
+
+        if ($hasCreateErrors) {
+            return 'add';
+        }
+
+        $requestedWorkspaceTab = (string) $request->session()->get('activeWorkspaceTab', '');
+
+        if (in_array($requestedWorkspaceTab, ['add', 'manage'], true)) {
+            return $requestedWorkspaceTab;
+        }
+
+        return ($openModal !== '' || $matchSearch !== '' || $gameType !== '') ? 'manage' : 'add';
+    }
+
+    private function trackedGameTypesCount(): int
+    {
+        return (int) MatchGame::query()
+            ->whereNotNull('game_type')
+            ->where('game_type', '!=', '')
+            ->distinct()
+            ->count('game_type');
+    }
+
+    private function shouldServeCachedDashboardResponse(
+        Request $request,
+        string $activeWorkspaceTab,
+        bool $hasCreateErrors,
+        string $matchSearch,
+        string $gameType,
+        string $openModal,
+    ): bool {
+        $sessionErrors = $request->session()->get('errors');
+
+        return $activeWorkspaceTab === 'add'
+            && ! app()->runningUnitTests()
+            && ! $hasCreateErrors
+            && $matchSearch === ''
+            && $gameType === ''
+            && $openModal === ''
+            && ! $request->session()->has('success')
+            && ! ($sessionErrors instanceof ViewErrorBag && $sessionErrors->any());
+    }
+
+    private function hasCreateWorkspaceErrors(Request $request): bool
+    {
+        $sessionErrors = $request->session()->get('errors');
+
+        return $sessionErrors instanceof ViewErrorBag
+            && (
+                $sessionErrors->has('name')
+                || $sessionErrors->has('avatar_emoji')
+                || $sessionErrors->has('winner_id')
+                || $sessionErrors->has('loser_id')
+                || $sessionErrors->has('winner_score')
+                || $sessionErrors->has('loser_score')
+                || $sessionErrors->has('game_type')
+            );
+    }
+
+    private function dashboardShellCacheKey(): string
+    {
+        return self::SHELL_CACHE_KEY . '.' . app()->environment();
+    }
+
+    private function dashboardResponseCacheKey(): string
+    {
+        return self::RESPONSE_CACHE_KEY . '.' . app()->environment();
     }
 }
