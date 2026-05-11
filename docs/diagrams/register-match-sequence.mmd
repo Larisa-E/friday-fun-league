@@ -1,0 +1,26 @@
+sequenceDiagram
+    actor User
+    participant Browser
+    participant Route as POST /matches
+    participant Controller as MatchGameController@store
+    participant Match as MatchGame
+    participant Stats as LeagueStatsService
+    participant Players as Participant model
+    participant Cache as Dashboard / Stats cache
+
+    User->>Browser: Fill in match form
+    Browser->>Route: Submit new match result
+    Route->>Controller: Call store(request, leagueStats)
+    Controller->>Controller: Validate input
+
+    alt Validation fails
+        Controller-->>Browser: Redirect back with errors
+    else Validation passes
+        Controller->>Match: Create match record
+        Controller->>Stats: recalculateParticipantStats()
+        Stats->>Players: Reset and recalculate standings
+        Players-->>Stats: Updated points, wins, losses
+        Stats-->>Controller: Standings updated
+        Controller->>Cache: Clear dashboard and stats cache
+        Controller-->>Browser: Redirect to dashboard with success message
+    end
