@@ -104,7 +104,6 @@ npm run build
 - Use `npm run dev` while you are editing CSS or JavaScript.
 - Use `npm run build` when you want the final production assets.
 - Use `composer setup` only after the MySQL database already exists.
-- If you want to import the included `friday_fun_league_db.sql` file in phpMyAdmin, do that instead of running a fresh migration on an empty database.
 - If you use `php artisan serve`, Apache from XAMPP is not required.
 - If you want to use XAMPP Apache instead, do not run Apache and `php artisan serve` for the same project at the same time.
 
@@ -119,9 +118,9 @@ http://127.0.0.1:8000
 1. Open the dashboard.
 2. Check the rank list to see points, wins, losses, matches, and win percentage.
 3. Use `Refresh` if you want the top dashboard data to update without reloading the page.
-4. Add a new participant in the `Add Participant` card.
-5. Register a new match in the `Register Match` card.
-6. Use `Edit` or `Delete` in the management area if you need to correct saved data.
+4. Use the `Add` tab to open the `Add Participant` and `Register Match` tools.
+5. Add a new participant or register a new match from that tab.
+6. Switch to the `Manage` tab if you need to edit, delete, search, or filter saved data.
 7. Use the search and filter area to narrow the match history.
 8. Open the `Statistics` page to see charts and summary numbers.
 
@@ -160,11 +159,12 @@ The tests use the Laravel test setup in `phpunit.xml` and run with SQLite in mem
 
 Logs are simple notes the app writes about what happened.
 
-This project now uses its own log file for important participant and match actions:
+This project now uses its own daily log files for important participant and match actions:
 
-- `storage/logs/league-YYYY-MM-DD.log`
+- `storage/logs/league-YYYY-MM-DD.log` for normal app usage
+- `storage/logs/league-testing-YYYY-MM-DD.log` during test runs
 
-The file is created automatically the first time the app writes to it.
+The files are created automatically the first time the app writes to them.
 
 How logs help:
 
@@ -194,7 +194,7 @@ powershell -Command "Get-Content storage\\logs\\league-2026-04-30.log -Tail 30"
 - `resources/css` contains the main app styles
 - `resources/js` contains the main frontend scripts
 - `resources/views` contains the Blade UI files
-- `docs/screenshots` contains screenshots and Lighthouse proof files used in the documentation
+- `docs/screenshots` contains screenshots used in the documentation
 - `database/migrations` contains the table definitions
 - `tests` contains feature and unit tests
 
@@ -210,10 +210,33 @@ powershell -Command "Get-Content storage\\logs\\league-2026-04-30.log -Tail 30"
 
 Exported diagram images are saved in `docs/diagrams`.
 
-- The architecture diagram shows the app at a high level.
-- The MVC diagram shows how Blade, controllers, models, and the service layer work together.
-- The sequence diagram shows what happens when a match is registered.
-- The ER diagram shows the database tables and how they are connected.
+### Architecture overview
+
+![Architecture overview](docs/diagrams/architecture-overview.png)
+
+This diagram shows the app at a high level.
+The user opens the app in the browser, Laravel handles the main logic, and MySQL stores the data.
+
+### MVC structure
+
+![MVC structure](docs/diagrams/MVC%20structure.png)
+
+This diagram shows how the main Laravel parts work together.
+The request goes through the routes to the controllers, the controllers work with models and services, and Blade views return the page back to the browser.
+
+### Database ER diagram
+
+![Database ER diagram](docs/diagrams/database-er-diagram.png)
+
+This diagram shows the two main database tables and how they are connected.
+`participants` stores player and ranking data, and `match_games` stores each saved match with a winner and a loser.
+
+### Register match sequence diagram
+
+![Register match sequence diagram](docs/diagrams/register-match-sequence.png)
+
+This diagram shows what happens when a user saves a new match result.
+The app validates the form, saves the match, recalculates the standings, clears the cache, and then sends the user back to the dashboard with a success message.
 
 ## UI design choices
 
@@ -244,12 +267,12 @@ Async refresh means the page updates data that is already visible on the screen.
 The project now uses lazy loading in a few places.
 
 - The first page load shows only the first 10 rank-list rows.
-- The first page load shows only the first 10 history rows.
+- When the user opens the `Manage` tab, it starts with the first 10 history rows.
 - When the user clicks `Load more` under the rank list, the browser asks the server for the next players in the background.
 - When the user clicks `Load more` under match history, the browser asks the server for the next match rows in the background.
-- The new rows are added to the same table without reloading the page.
+- The new rows are added to the same page section without reloading the page.
 - The statistics page loads the chart scripts only when the chart area is reached.
-- The dashboard uses one shared Edit popup. When the user clicks Edit, the app fills that popup with the correct data. This is better than loading a hidden popup for every row at the start.
+- The dashboard uses shared Edit popups. When the user clicks Edit, the app fills the correct popup with the matching data. This is better than loading a hidden popup for every row at the start.
 
 Lazy loading means the page does not load all extra content at the start. It loads more only when the user needs it.
 
@@ -259,56 +282,17 @@ Some frontend files were cleaned up to help the Lighthouse score.
 
 Vite is a frontend build tool. It prepares CSS and JavaScript files so the browser can load them more cleanly and quickly.
 
-- The layout now uses Vite to load the built CSS and JavaScript files.
-- Bootstrap CSS is now loaded from the local project files instead of a CDN link.
-- The large inline style block was moved into `resources/css/app.css`.
-- The large dashboard script was moved into `resources/js/dashboard.js`.
-- `resources/js/app.js` now loads only the Bootstrap JavaScript parts the app really uses.
-- `resources/js/app.js` also loads the dashboard script only on the dashboard page.
-- The statistics page now lazy loads local Chart.js files through Vite instead of loading Chart.js from a CDN.
-- The statistics page now sends its chart data in a JSON script block and caches repeated stats queries for one minute.
-- Some lower dashboard sections are deferred so the top of the page can show faster.
-- Unused Tailwind CSS directives were removed from the main stylesheet to reduce the CSS payload.
-
-### In easy words
-
-Here is what changed, explained simply:
-
 - I removed CSS that the page was not really using, so the browser has less styling to read at the start.
 - I moved statistics-only styling into its own file, so the dashboard does not load extra stats styling when it does not need it.
 - I stopped loading extra web font files and used a system font stack, so the text can appear faster.
 - I made Bootstrap JavaScript load in smaller pieces, so the page does not download dashboard-only code everywhere.
 - I made the charts load later, only when the statistics area is needed.
 - I moved the heavy manage section on the dashboard so it loads when the user opens that tab, instead of loading all of it immediately.
-- I added cache and compression rules for Apache/XAMPP, so files can be sent more efficiently in a production-like test.
+- I added cache and compression handling for the local server, so files can be sent more efficiently during local testing.
 - I cached repeated statistics queries for a short time, so the stats page does not repeat the same work on every request.
 
-The simple idea is this:
-
-- less code at the start
-- less CSS at the start
-- less JavaScript at the start
-- less HTML at the start
-- less repeated server work
-
-That is what helped the Lighthouse result.
-
-Important note for testing:
-
-- Run `npm run build` before you test Lighthouse.
-- If you want Lighthouse to include the cache headers and compression rules from `public/.htaccess`, test through XAMPP Apache instead of `php artisan serve`.
-- `php artisan serve` is still fine for normal development, but it will not apply those Apache delivery optimizations.
-
-The main point:
-
-- The browser gets cleaner frontend files.
-- Less code has to be loaded at the start.
-- The first visible part of the page can appear faster.
-- This can help Lighthouse give a better performance result.
 
 ## Assignment and submission notes
-
-The current project still matches the main assignment direction:
 
 - Laravel backend with Blade views
 - MySQL database
@@ -320,81 +304,24 @@ The current project still matches the main assignment direction:
 - logs for service desk style support
 - architecture and documentation support
 
-The remaining manual submission items are not code changes inside the repo:
-
-- GitHub link
-- live demo link
-- presentation slides
-
-For the presentation, you can use the sections already in this README about:
-
-- why Laravel, Blade, Bootstrap, MySQL, and Chart.js were chosen
-- simple comparison with alternatives
-- conclusion and future improvements
-- ITIL 4 practices used in the project
-
-## Lighthouse results
-
-The latest local Lighthouse report is saved in `docs/screenshots/lighthouse-mobile-2026-05-07.json`.
-
-Current result:
-
-- Performance: 81
-- Accessibility: 100
-- Best Practices: 100
-- SEO: 91
-- First Contentful Paint: 3.5 s
-- Time to Interactive: 3.5 s
-- Largest Contentful Paint: 3.5 s
-- Speed Index: 5.2 s
-
-What this means:
-
-- Accessibility, Best Practices, and SEO are strong in the latest saved run.
-- Performance is lower in this saved localhost mobile-style run than it was in an older report.
-- Time to Interactive is above 3 seconds in this saved run.
-- First Contentful Paint is also above 2 seconds in this saved run.
-- Localhost results can change from run to run and can look worse than a real production server.
-
-## Simple Difference
-
-- Async refresh updates content that is already on the page.
-- Lazy loading loads extra content later instead of loading everything at the start.
-
-Examples from this project:
-
-- `Refresh` is async because it updates the rank list and latest matches that are already visible.
-- The rank-list `Load more` button is lazy loading because it loads extra player rows only when the user clicks the button.
-- `Load more` is lazy loading because it loads extra match-history rows only when the user clicks the button.
-- The statistics charts are lazy loaded because the chart scripts are loaded only when the chart section is reached.
-- The edit modals are lazy loaded because one shared modal is filled when the user clicks `Edit` instead of loading many hidden modals at page start.
-
-The main files are:
-
-- `DashboardController` prepares the first rank-list rows and history rows, and returns more rows as JSON when needed.
-- `routes/web.php` contains the background routes, including the leaderboard and history load-more routes.
-- `dashboard.blade.php` contains the dashboard layout, buttons, shared edit popups, and hidden values used by JavaScript.
-- `resources/js/dashboard.js` contains the dashboard JavaScript for `Refresh`, both `Load more` buttons, shared edit popups, and scroll restore.
-- `resources/js/app.js` loads the main frontend JavaScript and only the Bootstrap parts the app needs.
-- `stats.blade.php`, `resources/js/stats-page.js`, and `resources/js/stats-charts.js` lazy load the statistics charts from local Vite-managed files.
-
 ## File Explanations
 
 - `config/logging.php` sets up the log channels and includes a separate `league` log file for app activity.
-- `DashboardController.php` loads the dashboard data, statistics data, refresh data, and load-more data.
+- `DashboardController.php` loads the dashboard shell, statistics data, refresh data, load-more data, and the lazy workspace partials.
 - `MatchGameController.php` saves, edits, and deletes match results.
 - `ParticipantController.php` saves, edits, and deletes participants.
 - `LeagueStatsService.php` recalculates participant points, wins, losses, and matches played from match history.
 - `resources/views/layouts/app.blade.php` loads the built frontend files with Vite.
-- `resources/css/app.css` contains the Bootstrap CSS import and the custom app styles.
+- `resources/css/app.css` contains the Bootstrap CSS import and the shared app styles.
 - `resources/js/app.js` loads the main frontend JavaScript and the Bootstrap JavaScript parts the app needs.
 - `resources/js/dashboard.js` contains the dashboard JavaScript for Refresh, Load more, shared popups, and scroll restore.
 - `resources/js/stats-page.js` lazy loads the local chart files when the statistics section is needed.
 - `resources/js/stats-charts.js` builds the statistics charts after Chart.js has loaded.
-- `dashboard.blade.php` shows the dashboard page and provides the HTML and hidden data used by the dashboard JavaScript.
+- `dashboard.blade.php` shows the dashboard shell and provides the HTML and hidden data used by the dashboard JavaScript.
+- `resources/views/dashboard/partials/manage-workspace.blade.php` contains the manage tools, shared edit popups, and match-history UI.
 - `stats.blade.php` shows the statistics page and provides the hidden data used by the statistics JavaScript.
 - `routes/web.php` connects each URL to the correct controller method.
-- `docs/screenshots` stores the screenshots and Lighthouse JSON report used in the documentation.
+- `docs/screenshots` stores the screenshots used in the documentation.
 - The feature test files check that the main user actions still work correctly.
 
 ## Monitoring and event management
@@ -422,36 +349,22 @@ This project is not a full company-level ITIL setup, but you can still see sever
 - If `php artisan migrate` says the database does not exist, create `friday_fun_league_db` first in phpMyAdmin.
 - If you see a MySQL connection or access-denied error, make sure XAMPP MySQL is running and that your `.env` values match your local host, port, database, username, and password.
 - If Laravel says the application key is missing, run `php artisan key:generate`.
-- If CSS or JavaScript changes do not appear, run `npm run dev` while you are working or run a fresh `npm run build`.
+- If CSS or JavaScript changes do not appear, run `npm run dev` while you are working or run a fresh `npm run build` and `php artisan optimize:clear`.
 - If port `8000` is already busy, start Laravel with `php artisan serve --port=8001`.
 - If you use XAMPP Apache for this project, do not also keep `php artisan serve` running for the same app.
 
 
-## Alternative solutions and future improvements
+## Conclusion and future improvements
 
-- A React or Vue frontend could be used for a more interactive single-page solution.
-- WebSockets or Server-Sent Events could be used instead of a manual refresh button for live updates.
-- The app could be deployed behind a web server with compression and stronger cache headers to improve FCP further.
-- Login and user roles could be added in a future version.
-- More automated frontend tests could be added for browser-side behavior.
-- A full monitoring solution could be added instead of only file-based logging.
-- These ideas show what could be improved if the project becomes larger in the future.
+This project worked well with Laravel, Blade, Bootstrap, and Vite because the app was easier to build, manage, and update.
 
-## Conclusion
-
-Laravel, Blade, Bootstrap, and Vite met the expectations for this project.
-
-- Development was faster because Laravel and Blade made CRUD flows and server-rendered pages easier to build.
-- Data handling worked well because Laravel, Eloquent, and the database structure made it easier to save and update tournament data.
-- Performance improved after moving CSS and JavaScript into Vite-managed files, splitting the dashboard and statistics scripts, and reducing unused assets.
-- For a project like this, I would still choose this stack again because it is practical, clear, and easier to maintain.
-- If I had to build a much more real-time or highly interactive app in the future, I would consider React or Vue together with an API-based backend.
+- MySQL was a good choice for the current version of the project.
+- In a bigger version, React or Vue could be added for a more interactive frontend.
+- SQL Server could also be a good option if the project needed stronger Microsoft integration or more enterprise-style reporting.
+- Login, user roles, and more automated tests would be good next steps.
 
 ## Notes
 
 - No login/authentication is included because it was not required for the assignment.
 - The app uses match history as the source of truth for standings.
 - A service class is used to recalculate standings after create, edit, and delete actions.
-- The `Refresh` button is async because it updates the current dashboard data in the background.
-- The rank-list `Load more` button uses lazy loading because it loads extra player rows only when the user asks for them.
-- The `Load more` button uses lazy loading because it loads extra match-history rows only when the user asks for them.
