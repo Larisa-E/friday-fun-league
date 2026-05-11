@@ -1,0 +1,45 @@
+flowchart LR
+    U[User] --> B[Browser]
+    B -->|Request| R[routes/web.php]
+
+    R --> DC[DashboardController]
+    R --> PC[ParticipantController]
+    R --> MC[MatchGameController]
+
+    subgraph ModelAndService[Model and service layer]
+        PM[Participant model]
+        MM[MatchGame model]
+        LS[LeagueStatsService]
+        CACHE[StatsPageCache / Cache]
+    end
+
+    subgraph ViewLayer[View layer]
+        DASH[dashboard.blade.php]
+        PARTIALS[dashboard partials]
+        STATS[stats.blade.php]
+    end
+
+    DC --> PM
+    DC --> MM
+    DC --> CACHE
+    DC --> DASH
+    DC --> PARTIALS
+    DC --> STATS
+
+    PC --> PM
+    PC --> LS
+    PC --> DASH
+
+    MC --> MM
+    MC --> LS
+    MC --> DASH
+
+    LS --> PM
+    LS --> MM
+
+    PM --> DB[(MySQL / MariaDB)]
+    MM --> DB
+
+    DASH --> B
+    PARTIALS --> B
+    STATS --> B
