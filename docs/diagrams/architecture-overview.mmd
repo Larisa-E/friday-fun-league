@@ -1,0 +1,33 @@
+flowchart LR
+    U[User] --> B[Browser]
+
+    subgraph Laravel[Laravel Application]
+        R[Routes]
+        C[Controllers]
+        V[Blade Views]
+        S[Services and Cache]
+        M[Eloquent Models]
+    end
+
+    subgraph Assets[Frontend Assets]
+        JS[dashboard.js / stats-page.js]
+        CSS[Vite-built CSS]
+        LIBS[Bootstrap / Chart.js]
+    end
+
+    DB[(MySQL / MariaDB)]
+
+    B -->|GET / POST / PUT / DELETE| R
+    R --> C
+    C --> V
+    V --> B
+
+    C --> M
+    C --> S
+    S --> M
+    M --> DB
+
+    B --> JS
+    JS -->|background refresh / load more| R
+    CSS --> B
+    LIBS --> B
