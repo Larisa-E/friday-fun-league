@@ -26,9 +26,10 @@ class DashboardController extends Controller
         $hasCreateErrors = $this->hasCreateWorkspaceErrors($request);
         $activeWorkspaceTab = $this->resolveActiveWorkspaceTab($request, $openModal, $matchSearch, $gameType);
         $lazyLoadDashboardCollections = $this->shouldServeCachedDashboardResponse($request, $activeWorkspaceTab, $hasCreateErrors, $matchSearch, $gameType, $openModal);
+        $dashboardCache = $this->dashboardCache();
 
         if ($lazyLoadDashboardCollections) {
-            $html = Cache::remember(
+            $html = $dashboardCache->remember(
                 $this->dashboardResponseCacheKey(),
                 now()->addMinutes(10),
                 fn (): string => $this->buildDashboardView(
@@ -66,7 +67,7 @@ class DashboardController extends Controller
         string $openModal,
     ) {
 
-        $shellData = Cache::remember($this->dashboardShellCacheKey(), now()->addMinutes(10), function (): array {
+        $shellData = $this->dashboardCache()->remember($this->dashboardShellCacheKey(), now()->addMinutes(10), function (): array {
             $leaderboardParticipants = $this->standingsQuery()
                 ->limit(self::LEADERBOARD_LIMIT)
                 ->get();
@@ -397,5 +398,13 @@ class DashboardController extends Controller
     private function dashboardResponseCacheKey(): string
     {
         return self::RESPONSE_CACHE_KEY . '.' . app()->environment();
+    }
+
+    private function dashboardCache()
+    {
+        $defaultStore = (string) config('cache.default', 'file');
+        $store = $defaultStore === 'database' ? 'file' : $defaultStore;
+
+        return Cache::store($store);
     }
 }
