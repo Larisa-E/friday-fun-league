@@ -86,37 +86,31 @@
                             </tr>
                         </thead>
                         <tbody id="leaderboard-body">
-                            @if($lazyLoadDashboardCollections)
-                                <tr>
-                                    <td colspan="7" class="empty-state">Loading leaderboard…</td>
-                                </tr>
-                            @else
-                                @forelse($leaderboardParticipants as $i => $participant)
-                                @php
-                                    $winPct = $participant->matches_played > 0
-                                        ? round($participant->wins / $participant->matches_played * 100, 1)
-                                        : 0;
-                                @endphp
-                                <tr>
-                                    <td>{{ $i + 1 }}</td>
-                                    <td class="fw-semibold">
-                                        <span class="player-line">
-                                            <span class="player-avatar">{{ $participant->avatar_emoji ?: strtoupper(substr($participant->name, 0, 1)) }}</span>
-                                            <span class="player-name">{{ $participant->name }}</span>
-                                        </span>
-                                    </td>
-                                    <td>{{ $participant->points }}</td>
-                                    <td>{{ $participant->wins }}</td>
-                                    <td>{{ $participant->losses }}</td>
-                                    <td>{{ $participant->matches_played }}</td>
-                                    <td>{{ $winPct }}%</td>
-                                </tr>
-                                @empty
-                                <tr>
-                                    <td colspan="7" class="empty-state">No participants yet.</td>
-                                </tr>
-                                @endforelse
-                            @endif
+                            @forelse($leaderboardParticipants as $i => $participant)
+                            @php
+                                $winPct = $participant->matches_played > 0
+                                    ? round($participant->wins / $participant->matches_played * 100, 1)
+                                    : 0;
+                            @endphp
+                            <tr>
+                                <td>{{ $i + 1 }}</td>
+                                <td class="fw-semibold">
+                                    <span class="player-line">
+                                        <span class="player-avatar">{{ $participant->avatar_emoji ?: strtoupper(substr($participant->name, 0, 1)) }}</span>
+                                        <span class="player-name">{{ $participant->name }}</span>
+                                    </span>
+                                </td>
+                                <td>{{ $participant->points }}</td>
+                                <td>{{ $participant->wins }}</td>
+                                <td>{{ $participant->losses }}</td>
+                                <td>{{ $participant->matches_played }}</td>
+                                <td>{{ $winPct }}%</td>
+                            </tr>
+                            @empty
+                            <tr>
+                                <td colspan="7" class="empty-state">No participants yet.</td>
+                            </tr>
+                            @endforelse
                         </tbody>
                     </table>
                 </div>
@@ -128,11 +122,9 @@
                         type="button"
                         class="btn btn-outline-primary"
                         aria-controls="leaderboard-body"
-                        @if($lazyLoadDashboardCollections || $leaderboardParticipants->count() >= $totalLeaderboardParticipants) disabled @endif
+                        @if($leaderboardParticipants->count() >= $totalLeaderboardParticipants) disabled @endif
                     >
-                        @if($lazyLoadDashboardCollections)
-                            Loading players…
-                        @elseif($leaderboardParticipants->count() >= $totalLeaderboardParticipants)
+                        @if($leaderboardParticipants->count() >= $totalLeaderboardParticipants)
                             All players loaded
                         @else
                             <span class="button-icon" aria-hidden="true">
@@ -143,9 +135,7 @@
                     </button>
 
                     <div id="leaderboard-load-more-status" class="text-muted small" role="status" aria-live="polite" aria-atomic="true">
-                        @if($lazyLoadDashboardCollections)
-                            Loading leaderboard rows.
-                        @elseif($totalLeaderboardParticipants === 0)
+                        @if($totalLeaderboardParticipants === 0)
                             No players yet.
                         @elseif($leaderboardParticipants->count() >= $totalLeaderboardParticipants)
                             All rank-list rows are already shown.
@@ -165,26 +155,22 @@
                 <p class="muted-note mb-0">Newest results are shown first.</p>
             </div>
             <div class="card-body p-0">
-                <div id="latest-matches-body" class="match-stack latest-match-stack" role="list">
-                    @if($lazyLoadDashboardCollections)
-                        <div class="empty-state">Loading latest matches…</div>
-                    @else
-                        @forelse($latestMatches as $match)
-                        <article class="match-tile match-tile-latest" role="listitem">
-                            <div class="match-latest-header">
-                                <span class="match-latest-game">{{ $match->game_type ?? 'Unspecified' }}</span>
-                                <span class="match-latest-time">{{ $match->played_at->format('d M Y H:i') }}</span>
-                            </div>
-                            <div class="match-tile-main match-latest-scoreline">
-                                <span class="match-player match-player-winner">{{ $match->winner->name }}</span>
-                                <span class="score-badge match-score-badge">{{ $match->winner_score }} - {{ $match->loser_score }}</span>
-                                <span class="match-player match-player-loser">{{ $match->loser->name }}</span>
-                            </div>
-                        </article>
-                        @empty
-                        <div class="empty-state">No matches yet.</div>
-                        @endforelse
-                    @endif
+                <div id="latest-matches-body" class="match-stack latest-match-stack">
+                    @forelse($latestMatches as $match)
+                    <article class="match-tile match-tile-latest">
+                        <div class="match-latest-header">
+                            <span class="match-latest-game">{{ $match->game_type ?? 'Unspecified' }}</span>
+                            <span class="match-latest-time">{{ $match->played_at->format('d M Y H:i') }}</span>
+                        </div>
+                        <div class="match-tile-main match-latest-scoreline">
+                            <span class="match-player match-player-winner">{{ $match->winner->name }}</span>
+                            <span class="score-badge match-score-badge">{{ $match->winner_score }} - {{ $match->loser_score }}</span>
+                            <span class="match-player match-player-loser">{{ $match->loser->name }}</span>
+                        </div>
+                    </article>
+                    @empty
+                    <div class="empty-state">No matches yet.</div>
+                    @endforelse
                 </div>
             </div>
         </div>
@@ -280,7 +266,7 @@
     id="leaderboard-state"
     hidden
     data-leaderboard-url="{{ route('dashboard.leaderboard') }}"
-    data-offset="{{ $lazyLoadDashboardCollections ? 0 : $leaderboardParticipants->count() }}"
+    data-offset="{{ $leaderboardParticipants->count() }}"
     data-total="{{ $totalLeaderboardParticipants }}"
 ></div>
 
@@ -290,7 +276,7 @@
     hidden
     data-open-modal="{{ session('openModal') }}"
     data-dashboard-url="{{ route('dashboard.data') }}"
-    data-hydrate-dashboard="{{ $lazyLoadDashboardCollections ? 'true' : 'false' }}"
+    data-hydrate-dashboard="false"
 ></div>
 
 <div class="toast-container position-fixed top-0 end-0 p-3 app-toast-stack">
