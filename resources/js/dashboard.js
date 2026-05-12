@@ -30,8 +30,6 @@
             : modalToReopen;
     const defaultRefreshButtonHtml = refreshButton?.innerHTML ?? 'Refresh';
     const defaultLeaderboardLoadMoreButtonHtml = leaderboardLoadMoreButton?.innerHTML ?? 'Load more';
-    let addWorkspaceVisibilityObserver = null;
-
     const ensureBootstrapModules = async (moduleNames) => {
         if (typeof window.ensureBootstrapModules !== 'function') {
             return {};
@@ -816,38 +814,8 @@
     });
 
     document.getElementById('workspace-add-tab')?.addEventListener('shown.bs.tab', () => {
-        if (addWorkspaceVisibilityObserver) {
-            addWorkspaceVisibilityObserver.disconnect();
-            addWorkspaceVisibilityObserver = null;
-        }
-
         void loadAddWorkspace();
     });
-
-    if (addWorkspacePane?.dataset.addWorkspaceLoaded !== 'true'
-        && addWorkspacePane?.classList.contains('show')) {
-        const workspaceSection = addWorkspacePane.closest('.dashboard-workspace') ?? addWorkspacePane;
-
-        if (typeof window.IntersectionObserver === 'function') {
-            addWorkspaceVisibilityObserver = new window.IntersectionObserver((entries, observer) => {
-                if (!entries.some((entry) => entry.isIntersecting)) {
-                    return;
-                }
-
-                observer.disconnect();
-                addWorkspaceVisibilityObserver = null;
-                void loadAddWorkspace();
-            }, {
-                rootMargin: '240px 0px',
-            });
-
-            addWorkspaceVisibilityObserver.observe(workspaceSection);
-        } else {
-            deferUntilIdle(() => {
-                void loadAddWorkspace();
-            }, 1500);
-        }
-    }
 
     if (manageWorkspacePane?.dataset.manageWorkspaceLoaded === 'true') {
         moveManageWorkspaceModalsToBody();
